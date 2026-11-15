@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230284c7'/%3E%3Ctext x='50' y='66' font-size='52' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'%3E譯%3C/text%3E%3C/svg%3E" />
-  <title>AI 완전 자동 양방향 실시간 음성통역기</title>
+  <title>AI 무중단 양방향 실시간 음성통역기</title>
   <style>
     * {
       box-sizing: border-box;
@@ -78,6 +78,10 @@
       background-color: #9a3412;
       color: #fed7aa;
     }
+    .status-badge.renewing {
+      background-color: #4338ca;
+      color: #c7d2fe;
+    }
     .status-badge.error {
       background-color: #7f1d1d;
       color: #fca5a5;
@@ -119,30 +123,56 @@
     }
     .log-toolbar {
       background-color: #162032;
-      padding: 6px 16px;
+      padding: 6px 12px;
       border-bottom: 1px solid #334155;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
     }
-    .log-toolbar-title {
-      font-size: 12px;
-      color: #94a3b8;
+    .log-toolbar-left {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .session-timer-badge {
+      font-size: 11px;
+      font-family: monospace;
+      color: #38bdf8;
+      background-color: #0f172a;
+      padding: 3px 6px;
+      border-radius: 4px;
+      border: 1px solid #334155;
     }
     .log-toolbar-actions {
       display: flex;
-      gap: 6px;
+      gap: 4px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
     }
     .btn-tool {
       background-color: #334155;
       color: #e2e8f0;
       border: 1px solid #475569;
-      padding: 4px 10px;
+      padding: 4px 8px;
       border-radius: 6px;
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 600;
       cursor: pointer;
+    }
+    .btn-tool.summary-btn {
+      background-color: #4338ca;
+      border-color: #6366f1;
+      color: #e0e7ff;
+    }
+    .btn-tool.share-btn {
+      background-color: #0369a1;
+      border-color: #0284c7;
+      color: #e0f2fe;
+    }
+    .btn-tool.summary-btn:disabled {
+      opacity: 0.6;
+      cursor: wait;
     }
     .btn-tool.success {
       background-color: #065f46;
@@ -325,6 +355,51 @@
       font-size: 18px;
       font-weight: 500;
     }
+    .bubble.summary-card {
+      background-color: #1e1b4b;
+      border: 1px solid #4f46e5;
+      border-left: 4px solid #818cf8;
+      color: #f8fafc;
+      font-size: 14px;
+      line-height: 1.65;
+    }
+    .bubble.summary-card .bubble-content {
+      display: block;
+      white-space: pre-wrap;
+    }
+    .summary-card-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(129, 140, 248, 0.35);
+    }
+    .btn-summary-copy {
+      background-color: #312e81;
+      color: #e0e7ff;
+      border: 1px solid #6366f1;
+      padding: 8px 6px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s ease;
+    }
+    .btn-summary-copy:active {
+      background-color: #3730a3;
+    }
+    .btn-summary-copy.foreign {
+      background-color: #064e3b;
+      color: #d1fae5;
+      border-color: #10b981;
+    }
+    .btn-summary-copy.copied {
+      background-color: #065f46 !important;
+      border-color: #34d399 !important;
+      color: #ffffff !important;
+    }
     .bubble-header {
       display: flex;
       justify-content: space-between;
@@ -335,6 +410,11 @@
       font-size: 11px;
       color: #7dd3fc;
       font-weight: 600;
+    }
+    .bubble.summary-card .bubble-label {
+      color: #a5b4fc;
+      font-size: 12px;
+      font-weight: 700;
     }
     .bubble-time {
       font-size: 10px;
@@ -443,7 +523,7 @@
   <header>
     <div>
       <h1>AI 실시간 음성 동시통역</h1>
-      <div class="header-sub">말하면 즉시 음성 송출 + 화면 문자 기록</div>
+      <div class="header-sub">무중단 자동갱신 · 이중언어 회의록 · 즉시공유</div>
     </div>
     <div class="header-right">
       <span id="headerTierBadge" class="tier-badge">무료 키</span>
@@ -460,9 +540,13 @@
   </nav>
 
   <div class="log-toolbar">
-    <span class="log-toolbar-title">대화 기록 내보내기</span>
+    <div class="log-toolbar-left">
+      <span id="sessionTimerBadge" class="session-timer-badge" title="현재 세션 경과 시간 (12분마다 자동 갱신)">00:00</span>
+    </div>
     <div class="log-toolbar-actions">
-      <button id="copyLogBtn" class="btn-tool" type="button">대화 복사</button>
+      <button id="summarizeBtn" class="btn-tool summary-btn" type="button">이중언어 요약</button>
+      <button id="shareLogBtn" class="btn-tool share-btn" type="button">공유하기</button>
+      <button id="copyLogBtn" class="btn-tool" type="button">복사</button>
       <button id="downloadTxtBtn" class="btn-tool" type="button">TXT 저장</button>
     </div>
   </div>
@@ -526,14 +610,21 @@
         </select>
       </div>
       <div class="field-group">
+        <label for="autoRenewSelect">장시간 무중단 세션 갱신</label>
+        <select id="autoRenewSelect">
+          <option value="on">12분마다 자동 갱신 (15분 제한 방지)</option>
+          <option value="off">자동 갱신 끄기</option>
+        </select>
+      </div>
+    </div>
+    <div class="row-2">
+      <div class="field-group">
         <label for="voiceOutputSelect">음성 출력 설정</label>
         <select id="voiceOutputSelect">
           <option value="on">즉시 음성 출력 + 화면 문자 기록</option>
           <option value="off">무음 모드 (화면 문자만 기록)</option>
         </select>
       </div>
-    </div>
-    <div class="row-2">
       <div class="field-group">
         <label for="toneSelect">통역 어투</label>
         <select id="toneSelect">
@@ -541,6 +632,17 @@
           <option value="casual">구어체/친근한 대화</option>
           <option value="formal">격식체 (비즈니스/학술)</option>
         </select>
+      </div>
+    </div>
+    <div class="row-2">
+      <div class="field-group">
+        <label for="modelInput">실시간 음성 모델 ID</label>
+        <input type="text" id="modelInput" list="liveModelList" value="gemini-2.0-flash-exp" />
+        <datalist id="liveModelList">
+          <option value="gemini-2.0-flash-exp"></option>
+          <option value="gemini-2.0-flash-live-001"></option>
+          <option value="gemini-2.5-flash-native-audio-preview-09-2025"></option>
+        </datalist>
       </div>
       <div class="field-group">
         <label for="voiceNameSelect">AI 통역사 목소리</label>
@@ -553,24 +655,15 @@
       </div>
     </div>
     <div class="field-group">
-      <label for="modelInput">실시간 음성 모델 ID</label>
-      <input type="text" id="modelInput" list="liveModelList" value="gemini-2.0-flash-exp" />
-      <datalist id="liveModelList">
-        <option value="gemini-2.0-flash-exp"></option>
-        <option value="gemini-2.0-flash-live-001"></option>
-        <option value="gemini-2.5-flash-native-audio-preview-09-2025"></option>
-      </datalist>
-    </div>
-    <div class="field-group">
       <label for="glossaryInput">상황 및 전문 용어집 (선택 입력)</label>
-      <textarea id="glossaryInput" placeholder="예: 학술 세미나 또는 해외 거래처 미팅. 고유명사와 전문 용어를 적어두면 음성 통역에 즉시 반영됩니다."></textarea>
+      <textarea id="glossaryInput" placeholder="예: 학술 세미나 또는 해외 거래처 미팅. 고유명사와 전문 용어를 적어두면 음성 통역과 이중 언어 회의록 요약에 모두 반영됩니다."></textarea>
     </div>
   </section>
 
   <main id="transcriptBox" class="transcript-container">
     <div class="bubble system">
-      통역 시작을 누르면 스피커에서 AI 통역 음성이 나오는 동안 마이크가 자동으로 일시 정지되어 에코 루프를 차단합니다.<br />
-      말씀하시면 즉시 음성으로 통역되고 화면에는 대화 원문과 통역 문자가 기록됩니다.
+      통역 시작을 누르면 실시간 양방향 음성 통역과 대화 기록이 시작됩니다.<br />
+      이중언어 요약 버튼을 누르면 한국어 요약본과 상대방 언어 요약본이 생성되며, 카드 하단 버튼으로 각 언어 요약만 따로 복사할 수 있습니다.
     </div>
   </main>
 
@@ -604,6 +697,7 @@
     const partnerLangSelect = document.getElementById("partnerLangSelect");
     const autoModeSelect = document.getElementById("autoModeSelect");
     const echoGuardSelect = document.getElementById("echoGuardSelect");
+    const autoRenewSelect = document.getElementById("autoRenewSelect");
     const voiceOutputSelect = document.getElementById("voiceOutputSelect");
     const toneSelect = document.getElementById("toneSelect");
     const modelInput = document.getElementById("modelInput");
@@ -613,7 +707,10 @@
     const toggleSettingsBtn = document.getElementById("toggleSettingsBtn");
     const quickLangBtns = document.querySelectorAll(".quick-lang-btn");
     const statusBadge = document.getElementById("statusBadge");
+    const sessionTimerBadge = document.getElementById("sessionTimerBadge");
     const transcriptBox = document.getElementById("transcriptBox");
+    const summarizeBtn = document.getElementById("summarizeBtn");
+    const shareLogBtn = document.getElementById("shareLogBtn");
     const copyLogBtn = document.getElementById("copyLogBtn");
     const downloadTxtBtn = document.getElementById("downloadTxtBtn");
     const modeStatusBar = document.getElementById("modeStatusBar");
@@ -624,18 +721,27 @@
     const micStateLabel = document.getElementById("micStateLabel");
 
     const LANG_NAMES = {
-      en: { ko: "영어", en: "English" },
-      zh: { ko: "중국어", en: "Mandarin Chinese" },
-      ja: { ko: "일본어", en: "Japanese" },
-      es: { ko: "스페인어", en: "Spanish" }
+      en: { ko: "영어", en: "English", native: "English" },
+      zh: { ko: "중국어", en: "Mandarin Chinese", native: "中文" },
+      ja: { ko: "일본어", en: "Japanese", native: "日本語" },
+      es: { ko: "스페인어", en: "Spanish", native: "Español" }
     };
+
+    const AUTO_RENEW_SECONDS = 720;
 
     let activeKeyTier = "free";
     let ws = null;
     let isRunning = false;
     let isConnecting = false;
+    let isRenewing = false;
+    let renewalPending = false;
     let isAiSpeaking = false;
     let echoGuardTimer = null;
+    let sessionInterval = null;
+    let sessionElapsedSec = 0;
+    let totalElapsedSec = 0;
+    let reconnectAttemptCount = 0;
+
     let micStream = null;
     let inputAudioCtx = null;
     let processorNode = null;
@@ -656,6 +762,7 @@
       const savedPartner = localStorage.getItem("gemini_rt_partner_lang");
       const savedAutoMode = localStorage.getItem("gemini_rt_auto_mode");
       const savedEchoGuard = localStorage.getItem("gemini_rt_echo_guard");
+      const savedAutoRenew = localStorage.getItem("gemini_rt_auto_renew");
       const savedVoiceOut = localStorage.getItem("gemini_rt_voice_out");
       const savedTone = localStorage.getItem("gemini_rt_tone");
       const savedModel = localStorage.getItem("gemini_rt_model");
@@ -672,6 +779,7 @@
       if (savedPartner) partnerLangSelect.value = savedPartner;
       if (savedAutoMode) autoModeSelect.value = savedAutoMode;
       if (savedEchoGuard) echoGuardSelect.value = savedEchoGuard;
+      if (savedAutoRenew) autoRenewSelect.value = savedAutoRenew;
       if (savedVoiceOut) voiceOutputSelect.value = savedVoiceOut;
       if (savedTone) toneSelect.value = savedTone;
       if (savedModel) modelInput.value = savedModel;
@@ -690,6 +798,7 @@
       localStorage.setItem("gemini_rt_partner_lang", partnerLangSelect.value);
       localStorage.setItem("gemini_rt_auto_mode", autoModeSelect.value);
       localStorage.setItem("gemini_rt_echo_guard", echoGuardSelect.value);
+      localStorage.setItem("gemini_rt_auto_renew", autoRenewSelect.value);
       localStorage.setItem("gemini_rt_voice_out", voiceOutputSelect.value);
       localStorage.setItem("gemini_rt_tone", toneSelect.value);
       localStorage.setItem("gemini_rt_model", modelInput.value.trim());
@@ -726,9 +835,8 @@
       updateTierUI();
 
       if (isRunning) {
-        addSystemMessage(`API 키 등급이 [${newTier === "free" ? "무료 키" : "유료 키"}]로 변경되었습니다. 세션을 다시 연결합니다.`);
-        stopSession();
-        setTimeout(() => startSession(), 250);
+        addSystemMessage(`API 키 등급이 [${newTier === "free" ? "무료 키" : "유료 키"}]로 변경되었습니다. 새 키로 무중단 전환합니다.`);
+        triggerSeamlessRenewal("등급 전환");
       }
     }
 
@@ -852,6 +960,7 @@
 
     partnerLangSelect.addEventListener("change", () => selectPartnerLanguage(partnerLangSelect.value));
     echoGuardSelect.addEventListener("change", () => saveSettings());
+    autoRenewSelect.addEventListener("change", () => saveSettings());
 
     autoModeSelect.addEventListener("change", () => {
       saveSettings();
@@ -890,6 +999,79 @@
       }
     }
 
+    function formatDuration(sec) {
+      const m = String(Math.floor(sec / 60)).padStart(2, "0");
+      const s = String(sec % 60).padStart(2, "0");
+      return `${m}:${s}`;
+    }
+
+    function startSessionTimer() {
+      stopSessionTimer();
+      sessionElapsedSec = 0;
+      totalElapsedSec = 0;
+      sessionTimerBadge.textContent = "00:00";
+
+      sessionInterval = setInterval(() => {
+        if (!isRunning) return;
+        sessionElapsedSec += 1;
+        totalElapsedSec += 1;
+        sessionTimerBadge.textContent = formatDuration(totalElapsedSec);
+
+        if (autoRenewSelect.value === "on" && sessionElapsedSec >= AUTO_RENEW_SECONDS && !isRenewing) {
+          if (!isAiSpeaking && activeSources.length === 0) {
+            triggerSeamlessRenewal("12분 주기 자동 갱신");
+          } else {
+            renewalPending = true;
+          }
+        }
+      }, 1000);
+    }
+
+    function stopSessionTimer() {
+      if (sessionInterval) {
+        clearInterval(sessionInterval);
+        sessionInterval = null;
+      }
+    }
+
+    function getRecentConversationSummary() {
+      const bubbles = Array.from(transcriptBox.querySelectorAll(".bubble:not(.system):not(.error-diag):not(.summary-card)"));
+      if (bubbles.length === 0) return "";
+      const recent = bubbles.slice(-6);
+      const lines = recent.map((b) => {
+        const label = b.querySelector(".bubble-label")?.textContent.trim() || "";
+        const content = b.querySelector(".bubble-content")?.textContent.trim() || "";
+        return content ? `${label}: ${content}` : "";
+      }).filter(Boolean);
+      return lines.join("\n");
+    }
+
+    function triggerSeamlessRenewal(reasonLabel = "자동 갱신") {
+      if (!isRunning || isRenewing) return;
+      isRenewing = true;
+      renewalPending = false;
+      currentTranslatedBubble = null;
+      currentUserBubble = null;
+      setStatus("세션 무중단 갱신", "renewing");
+
+      const recentContext = getRecentConversationSummary();
+
+      if (ws) {
+        try {
+          ws.close(1000, "Seamless renewal");
+        } catch (e) {}
+        ws = null;
+      }
+
+      setTimeout(() => {
+        if (!isRunning) {
+          isRenewing = false;
+          return;
+        }
+        connectWebSocket(true, recentContext, reasonLabel);
+      }, 180);
+    }
+
     function setMicGateVisual(muted) {
       if (!isRunning) {
         volumeFill.classList.remove("muted");
@@ -919,8 +1101,8 @@
       return `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}${String(now.getSeconds()).padStart(2, "0")}`;
     }
 
-    function collectTranscriptText() {
-      const bubbles = transcriptBox.querySelectorAll(".bubble:not(.system):not(.error-diag)");
+    function collectDialogueOnlyText() {
+      const bubbles = transcriptBox.querySelectorAll(".bubble:not(.system):not(.error-diag):not(.summary-card)");
       if (bubbles.length === 0) return "";
       const lines = [];
       bubbles.forEach((b) => {
@@ -934,27 +1116,254 @@
       return lines.join("\n\n");
     }
 
+    function collectFullExportText() {
+      const dialogueText = collectDialogueOnlyText();
+      const summaryCards = transcriptBox.querySelectorAll(".bubble.summary-card");
+      if (!dialogueText && summaryCards.length === 0) return "";
+
+      let exportParts = [];
+      if (summaryCards.length > 0) {
+        const latestSummary = summaryCards[summaryCards.length - 1];
+        const summaryContent = latestSummary.querySelector(".bubble-content")?.textContent.trim() || "";
+        if (summaryContent) {
+          exportParts.push(`[AI 이중 언어 회의록 요약]\n${summaryContent}`);
+        }
+      }
+      if (dialogueText) {
+        exportParts.push(`[전체 통역 대화 녹취록]\n${dialogueText}`);
+      }
+      return exportParts.join("\n\n========================================\n\n");
+    }
+
+    async function copyTextFallback(text) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const tempArea = document.createElement("textarea");
+        tempArea.value = text;
+        tempArea.style.position = "fixed";
+        tempArea.style.left = "-9999px";
+        document.body.appendChild(tempArea);
+        tempArea.select();
+        document.execCommand("copy");
+        document.body.removeChild(tempArea);
+      }
+    }
+
+    function splitBilingualSummary(fullSummaryText, partnerNativeLabel) {
+      const dividerRegex = /\n\s*-{10,}\s*\n/;
+      if (dividerRegex.test(fullSummaryText)) {
+        const parts = fullSummaryText.split(dividerRegex);
+        return {
+          koPart: parts[0].trim(),
+          foreignPart: parts.slice(1).join("\n\n").trim()
+        };
+      }
+      const marker = `[${partnerNativeLabel} Meeting Summary]`;
+      const idx = fullSummaryText.indexOf(marker);
+      if (idx !== -1) {
+        return {
+          koPart: fullSummaryText.slice(0, idx).trim(),
+          foreignPart: fullSummaryText.slice(idx).trim()
+        };
+      }
+      return {
+        koPart: fullSummaryText.trim(),
+        foreignPart: fullSummaryText.trim()
+      };
+    }
+
+    // 이중 언어 AI 회의록 요약 생성 기능 (한국어 + 선택한 상대방 언어 나란히 생성 및 개별 복사 버튼 제공)
+    summarizeBtn.addEventListener("click", async () => {
+      const dialogueText = collectDialogueOnlyText();
+      if (!dialogueText) {
+        alert("요약할 대화 기록이 화면에 없습니다. 먼저 통역을 진행해 주세요.");
+        return;
+      }
+
+      const apiKey = getActiveApiKey();
+      if (!apiKey) {
+        alert("API 키가 설정되어 있지 않습니다. 설정창에서 API 키를 입력하거나 불러와 주세요.");
+        settingsPanel.classList.remove("hidden");
+        return;
+      }
+
+      const origBtnText = summarizeBtn.textContent;
+      summarizeBtn.disabled = true;
+      summarizeBtn.textContent = "요약 중...";
+
+      const glossary = glossaryInput.value.trim();
+      const partnerCode = partnerLangSelect.value;
+      const partnerInfo = LANG_NAMES[partnerCode];
+
+      const summaryPrompt = [
+        `다음은 한국어와 ${partnerInfo.ko}(${partnerInfo.en}) 간 실시간 음성 동시통역으로 기록된 대화 전문입니다.`,
+        `이 대화 내용을 면밀히 분석하여 한국어 회의록 요약과 ${partnerInfo.ko}(${partnerInfo.en}) 회의록 요약 두 가지 언어로 나란히 정리한 이중 언어 회의록을 작성해 주세요.`,
+        "출력 형식 엄수 규칙:",
+        "1. 별표(**)나 샵(#), 하이픈(-) 글머리 기호 같은 마크다운 특수문자를 절대 쓰지 말고 순수 텍스트와 숫자 번호(1., 2., 3., 4.)만 사용해 정리하십시오.",
+        "2. 먼저 [한국어 회의록 요약] 제목 아래에 아래 4개 항목을 한국어로 작성하십시오.",
+        "1. 전체 대화 주제 및 개요",
+        "2. 주요 논의 안건 및 핵심 내용",
+        "3. 합의 및 결정 사항 (없으면 '별도 확정 사항 없음'으로 표기)",
+        "4. 향후 조치 및 후속 일정 (없으면 '별도 후속 조치 없음'으로 표기)",
+        `3. 그 다음 줄에 반드시 정확히 하이픈 20개 구분선(--------------------)만 단독 줄로 넣고, 그 아래에 [${partnerInfo.native} Meeting Summary] 제목을 쓴 뒤 위와 동일한 4개 항목의 내용을 자연스럽고 격식 있는 ${partnerInfo.ko}(${partnerInfo.en})로 작성하십시오.`,
+        glossary ? `[참고 배경 및 전문 용어집]\n${glossary}` : "",
+        `[대화 녹취록]\n${dialogueText}`
+      ].filter(Boolean).join("\n\n");
+
+      try {
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{
+              role: "user",
+              parts: [{ text: summaryPrompt }]
+            }],
+            generationConfig: {
+              temperature: 0.2
+            }
+          })
+        });
+
+        const result = await response.json();
+        if (!response.ok || result.error) {
+          const errMsg = result.error ? result.error.message : `HTTP ${response.status}`;
+          throw new Error(errMsg);
+        }
+
+        const summaryText = result.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+        if (!summaryText) {
+          throw new Error("AI로부터 요약 결과를 받지 못했습니다.");
+        }
+
+        const { koPart, foreignPart } = splitBilingualSummary(summaryText, partnerInfo.native);
+
+        const summaryBubble = createBubbleElement(
+          "summary-card",
+          `이중 언어 회의록 요약 (한국어 + ${partnerInfo.ko} · 경과 ${sessionTimerBadge.textContent})`
+        );
+        const contentSpan = summaryBubble.querySelector(".bubble-content");
+        contentSpan.textContent = summaryText;
+
+        // 카드 하단 개별 언어 요약 복사 버튼 영역 생성
+        const actionRow = document.createElement("div");
+        actionRow.className = "summary-card-actions";
+
+        const copyKoBtn = document.createElement("button");
+        copyKoBtn.type = "button";
+        copyKoBtn.className = "btn-summary-copy";
+        copyKoBtn.textContent = "한국어 요약만 복사하기";
+        copyKoBtn.addEventListener("click", async () => {
+          try {
+            await copyTextFallback(koPart);
+            const prevLabel = copyKoBtn.textContent;
+            copyKoBtn.textContent = "한국어 요약 복사됨";
+            copyKoBtn.classList.add("copied");
+            setTimeout(() => {
+              copyKoBtn.textContent = prevLabel;
+              copyKoBtn.classList.remove("copied");
+            }, 1600);
+          } catch (e) {
+            alert("복사 오류: " + e.message);
+          }
+        });
+
+        const copyForeignBtn = document.createElement("button");
+        copyForeignBtn.type = "button";
+        copyForeignBtn.className = "btn-summary-copy foreign";
+        copyForeignBtn.textContent = `${partnerInfo.ko} 요약만 복사하기`;
+        copyForeignBtn.addEventListener("click", async () => {
+          try {
+            await copyTextFallback(foreignPart);
+            const prevLabel = copyForeignBtn.textContent;
+            copyForeignBtn.textContent = `${partnerInfo.ko} 요약 복사됨`;
+            copyForeignBtn.classList.add("copied");
+            setTimeout(() => {
+              copyForeignBtn.textContent = prevLabel;
+              copyForeignBtn.classList.remove("copied");
+            }, 1600);
+          } catch (e) {
+            alert("복사 오류: " + e.message);
+          }
+        });
+
+        actionRow.appendChild(copyKoBtn);
+        actionRow.appendChild(copyForeignBtn);
+        summaryBubble.appendChild(actionRow);
+
+        transcriptBox.scrollTop = transcriptBox.scrollHeight;
+
+        summarizeBtn.textContent = "요약 완료";
+        summarizeBtn.classList.add("success");
+        setTimeout(() => {
+          summarizeBtn.textContent = origBtnText;
+          summarizeBtn.classList.remove("success");
+        }, 1800);
+      } catch (err) {
+        alert("이중 언어 회의록 요약 생성 중 오류가 발생했습니다:\n" + err.message);
+        summarizeBtn.textContent = origBtnText;
+      } finally {
+        summarizeBtn.disabled = false;
+      }
+    });
+
+    // 모바일 Web Share API 원터치 공유 기능
+    shareLogBtn.addEventListener("click", async () => {
+      const text = collectFullExportText();
+      if (!text) {
+        alert("공유할 회의록 요약이나 대화 기록이 없습니다.");
+        return;
+      }
+
+      const partnerInfo = LANG_NAMES[partnerLangSelect.value];
+      const shareTitle = `AI 이중 언어 통역 회의록 (한국어·${partnerInfo.ko} / ${new Date().toLocaleDateString("ko-KR")})`;
+      const fullShareBody = `${shareTitle}\n\n${text}`;
+
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: shareTitle,
+            text: fullShareBody
+          });
+          const origText = shareLogBtn.textContent;
+          shareLogBtn.textContent = "공유됨";
+          shareLogBtn.classList.add("success");
+          setTimeout(() => {
+            shareLogBtn.textContent = origText;
+            shareLogBtn.classList.remove("success");
+          }, 1600);
+        } catch (err) {
+          if (err.name !== "AbortError") {
+            try {
+              await copyTextFallback(fullShareBody);
+              alert("앱 직접 공유가 제한되어 전체 내용을 클립보드에 대신 복사했습니다. 카카오톡이나 메일 앱에 바로 붙여넣으실 수 있습니다.");
+            } catch (copyErr) {
+              alert("공유 중 오류가 발생했습니다: " + err.message);
+            }
+          }
+        }
+      } else {
+        try {
+          await copyTextFallback(fullShareBody);
+          alert("현재 브라우저는 모바일 공유 창을 지원하지 않아 전체 내용을 클립보드에 복사했습니다. 메신저나 메일 창에 바로 붙여넣으세요.");
+        } catch (err) {
+          alert("복사 오류: " + err.message);
+        }
+      }
+    });
+
     copyLogBtn.addEventListener("click", async () => {
-      const text = collectTranscriptText();
+      const text = collectFullExportText();
       if (!text) {
         alert("복사할 대화 기록이 없습니다.");
         return;
       }
       try {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          await navigator.clipboard.writeText(text);
-        } else {
-          const tempArea = document.createElement("textarea");
-          tempArea.value = text;
-          tempArea.style.position = "fixed";
-          tempArea.style.left = "-9999px";
-          document.body.appendChild(tempArea);
-          tempArea.select();
-          document.execCommand("copy");
-          document.body.removeChild(tempArea);
-        }
+        await copyTextFallback(text);
         const origText = copyLogBtn.textContent;
-        copyLogBtn.textContent = "복사 완료";
+        copyLogBtn.textContent = "복사됨";
         copyLogBtn.classList.add("success");
         setTimeout(() => {
           copyLogBtn.textContent = origText;
@@ -966,25 +1375,25 @@
     });
 
     downloadTxtBtn.addEventListener("click", () => {
-      const text = collectTranscriptText();
+      const text = collectFullExportText();
       if (!text) {
         alert("저장할 대화 기록이 없습니다.");
         return;
       }
-      const headerInfo = `=== AI 실시간 음성 동시통역 기록 (${new Date().toLocaleString("ko-KR")}) ===\n\n`;
+      const headerInfo = `=== AI 무중단 실시간 음성 동시통역 이중 언어 회의록 (${new Date().toLocaleString("ko-KR")}) ===\n\n`;
       const fullContent = "\uFEFF" + headerInfo + text + "\n";
       const blob = new Blob([fullContent], { type: "text/plain;charset=utf-8" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `통역기록_${getFileTimestamp()}.txt`;
+      a.download = `이중언어_통역회의록_${getFileTimestamp()}.txt`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
       const origText = downloadTxtBtn.textContent;
-      downloadTxtBtn.textContent = "저장 완료";
+      downloadTxtBtn.textContent = "저장됨";
       downloadTxtBtn.classList.add("success");
       setTimeout(() => {
         downloadTxtBtn.textContent = origText;
@@ -996,7 +1405,7 @@
 
     clearBtn.addEventListener("click", () => {
       if (transcriptBox.querySelectorAll(".bubble:not(.system)").length > 0) {
-        if (!confirm("화면에 표시된 대화 및 오류 기록을 모두 지우시겠습니까?")) return;
+        if (!confirm("화면에 표시된 대화 및 회의록 요약 기록을 모두 지우시겠습니까?")) return;
       }
       transcriptBox.innerHTML = "";
       currentTranslatedBubble = null;
@@ -1041,6 +1450,7 @@
       statusBadge.className = "status-badge";
       if (type === "connected") statusBadge.classList.add("connected");
       if (type === "speaking") statusBadge.classList.add("speaking");
+      if (type === "renewing") statusBadge.classList.add("renewing");
       if (type === "error") statusBadge.classList.add("error");
     }
 
@@ -1168,7 +1578,7 @@
       }
     }
 
-    function buildSystemInstruction() {
+    function buildSystemInstruction(recentContext = "") {
       const glossary = glossaryInput.value.trim();
       let prompt = [
         "당신은 한국어, 영어, 중국어, 일본어, 스페인어를 자유자재로 구사하는 실시간 음성 동시통역사입니다.",
@@ -1180,6 +1590,9 @@
 
       if (glossary) {
         prompt += `\n[상황 및 필수 용어집]\n${glossary}`;
+      }
+      if (recentContext) {
+        prompt += `\n[직전 대화 맥락 참고용 (이 내용에 대답하지 말고 이어서 들어오는 음성만 통역하십시오)]\n${recentContext}`;
       }
       return prompt;
     }
@@ -1229,6 +1642,7 @@
       setStatus("연결 중...", "normal");
       mainActionBtn.disabled = true;
       isConnecting = true;
+      reconnectAttemptCount = 0;
 
       try {
         micStream = await navigator.mediaDevices.getUserMedia({
@@ -1246,93 +1660,133 @@
         }
         nextPlayTime = outputAudioCtx.currentTime;
 
-        const modelName = modelInput.value.trim() || "gemini-2.0-flash-exp";
-        const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${encodeURIComponent(apiKey)}`;
-        ws = new WebSocket(wsUrl);
-
-        ws.onopen = () => {
-          const useVoice = voiceOutputSelect.value === "on";
-          const voiceName = voiceNameSelect.value || "Aoede";
-
-          const generationConfig = {
-            responseModalities: useVoice ? ["AUDIO"] : ["TEXT"]
-          };
-          if (useVoice) {
-            generationConfig.speechConfig = {
-              voiceConfig: {
-                prebuiltVoiceConfig: {
-                  voiceName: voiceName
-                }
-              }
-            };
-          }
-
-          const setupObj = {
-            model: `models/${modelName}`,
-            generationConfig: generationConfig,
-            systemInstruction: {
-              parts: [{ text: buildSystemInstruction() }]
-            },
-            inputAudioTranscription: {}
-          };
-          if (useVoice) {
-            setupObj.outputAudioTranscription = {};
-          }
-
-          ws.send(JSON.stringify({ setup: setupObj }));
-          startMicCapture();
-          requestWakeLock();
-
-          isConnecting = false;
-          isRunning = true;
-          isAiSpeaking = false;
-          setMicGateVisual(false);
-          mainActionBtn.disabled = false;
-          mainActionBtn.textContent = "통역 중지";
-          mainActionBtn.className = "btn-main btn-stop";
-          setStatus("실시간 통역 중", "connected");
-
-          const partnerKoName = LANG_NAMES[partnerLangSelect.value].ko;
-          addSystemMessage(`[${tierLabel}] 연결 완료. 한국어 또는 ${partnerKoName}로 말씀하시면 즉시 음성 통역됩니다.`);
-        };
-
-        ws.onmessage = async (event) => {
-          let rawText = event.data;
-          if (rawText instanceof Blob) {
-            rawText = await rawText.text();
-          }
-          const data = JSON.parse(rawText);
-          if (data.error) {
-            addErrorDiagnosticMessage(data.error.code || "API_ERROR", data.error.message || JSON.stringify(data.error));
-            return;
-          }
-          handleServerMessage(data);
-        };
-
-        ws.onerror = () => {
-          setStatus("연결 오류", "error");
-        };
-
-        ws.onclose = (e) => {
-          const wasActive = isRunning || isConnecting;
-          const isAbnormal = e.code !== 1000 && e.code !== 1005;
-          if (wasActive) {
-            if (isAbnormal || e.reason) {
-              setStatus(`오류 (${e.code})`, "error");
-              addErrorDiagnosticMessage(e.code, e.reason);
-            } else {
-              addSystemMessage(`통역 세션이 종료되었습니다. (코드: ${e.code})`);
-            }
-            cleanupResources();
-          }
-        };
-
+        startMicCapture();
+        requestWakeLock();
+        connectWebSocket(false, "", "");
       } catch (err) {
         isConnecting = false;
         mainActionBtn.disabled = false;
         setStatus("마이크 오류", "error");
         alert("마이크 권한 허용이 필요합니다.\n오류 내용: " + err.message);
       }
+    }
+
+    function connectWebSocket(isRenewal, recentContext, renewalReason) {
+      const apiKey = getActiveApiKey();
+      const tierLabel = activeKeyTier === "paid" ? "유료 키" : "무료 키";
+      const modelName = modelInput.value.trim() || "gemini-2.0-flash-exp";
+      const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${encodeURIComponent(apiKey)}`;
+
+      const socket = new WebSocket(wsUrl);
+      ws = socket;
+
+      socket.onopen = () => {
+        if (ws !== socket) return;
+        const useVoice = voiceOutputSelect.value === "on";
+        const voiceName = voiceNameSelect.value || "Aoede";
+
+        const generationConfig = {
+          responseModalities: useVoice ? ["AUDIO"] : ["TEXT"]
+        };
+        if (useVoice) {
+          generationConfig.speechConfig = {
+            voiceConfig: {
+              prebuiltVoiceConfig: {
+                voiceName: voiceName
+              }
+            }
+          };
+        }
+
+        const setupObj = {
+          model: `models/${modelName}`,
+          generationConfig: generationConfig,
+          systemInstruction: {
+            parts: [{ text: buildSystemInstruction(recentContext) }]
+          },
+          inputAudioTranscription: {}
+        };
+        if (useVoice) {
+          setupObj.outputAudioTranscription = {};
+        }
+
+        socket.send(JSON.stringify({ setup: setupObj }));
+
+        sessionElapsedSec = 0;
+        reconnectAttemptCount = 0;
+        isConnecting = false;
+        isRenewing = false;
+        isRunning = true;
+
+        mainActionBtn.disabled = false;
+        mainActionBtn.textContent = "통역 중지";
+        mainActionBtn.className = "btn-main btn-stop";
+        setMicGateVisual(false);
+        setStatus("실시간 통역 중", "connected");
+
+        if (!isRenewal) {
+          startSessionTimer();
+          const partnerKoName = LANG_NAMES[partnerLangSelect.value].ko;
+          addSystemMessage(`[${tierLabel}] 연결 완료. 한국어 또는 ${partnerKoName}로 말씀하시면 즉시 음성 통역됩니다.`);
+        } else {
+          addSystemMessage(`세션 무중단 갱신 완료 (${renewalReason} · 직전 대화 맥락 유지됨)`);
+        }
+      };
+
+      socket.onmessage = async (event) => {
+        if (ws !== socket) return;
+        let rawText = event.data;
+        if (rawText instanceof Blob) {
+          rawText = await rawText.text();
+        }
+        const data = JSON.parse(rawText);
+
+        if (data.goAway) {
+          if (!isRenewing) {
+            if (!isAiSpeaking && activeSources.length === 0) {
+              triggerSeamlessRenewal("서버 사전 예고 자동 갱신");
+            } else {
+              renewalPending = true;
+            }
+          }
+          return;
+        }
+
+        if (data.error) {
+          addErrorDiagnosticMessage(data.error.code || "API_ERROR", data.error.message || JSON.stringify(data.error));
+          return;
+        }
+        handleServerMessage(data);
+      };
+
+      socket.onerror = () => {
+        if (ws !== socket) return;
+        setStatus("연결 오류", "error");
+      };
+
+      socket.onclose = (e) => {
+        if (ws !== socket) return;
+        if (isRenewing) return;
+
+        const wasActive = isRunning || isConnecting;
+        if (!wasActive) return;
+
+        const isFatalPolicyError = e.code === 1008;
+        if (isRunning && !isFatalPolicyError && e.code !== 1000 && reconnectAttemptCount < 3) {
+          reconnectAttemptCount += 1;
+          addSystemMessage(`일시적 연결 끊김(코드 ${e.code}) 감지: 자동 재연결 시도 중 (${reconnectAttemptCount}/3)...`);
+          triggerSeamlessRenewal(`자동 복구 ${reconnectAttemptCount}회차`);
+          return;
+        }
+
+        if (e.code !== 1000 && e.code !== 1005) {
+          setStatus(`오류 (${e.code})`, "error");
+          addErrorDiagnosticMessage(e.code, e.reason);
+        } else {
+          addSystemMessage(`통역 세션이 종료되었습니다. (코드: ${e.code})`);
+        }
+        cleanupResources();
+      };
     }
 
     function handleServerMessage(data) {
@@ -1371,18 +1825,21 @@
       if (serverContent.turnComplete) {
         currentTranslatedBubble = null;
         currentUserBubble = null;
+        if (renewalPending && activeSources.length === 0 && !isAiSpeaking) {
+          triggerSeamlessRenewal("대화 턴 완료 후 자동 갱신");
+        }
       }
     }
 
     function startMicCapture() {
+      if (inputAudioCtx) return;
       inputAudioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
       const source = inputAudioCtx.createMediaStreamSource(micStream);
       processorNode = inputAudioCtx.createScriptProcessor(4096, 1, 1);
 
       processorNode.onaudioprocess = (e) => {
-        if (!isRunning || !ws || ws.readyState !== WebSocket.OPEN) return;
+        if (!isRunning || isRenewing || !ws || ws.readyState !== WebSocket.OPEN) return;
 
-        // 스피커 모드에서 AI 음성이 재생 중이면 마이크 데이터 전송을 즉시 차단해 에코 루프 방지
         const blockEcho = echoGuardSelect.value === "speaker" && isAiSpeaking;
         if (blockEcho) {
           return;
@@ -1461,13 +1918,15 @@
       source.onended = () => {
         activeSources = activeSources.filter(s => s !== source);
         if (activeSources.length === 0) {
-          // 마지막 음성 조각 재생 완료 후 실내 잔향 흡수를 위해 0.45초 뒤 마이크 재개
           echoGuardTimer = setTimeout(() => {
             isAiSpeaking = false;
             echoGuardTimer = null;
             if (isRunning) {
               setMicGateVisual(false);
               setStatus("실시간 통역 중", "connected");
+              if (renewalPending) {
+                triggerSeamlessRenewal("12분 주기 자동 갱신");
+              }
             }
           }, 450);
         }
@@ -1496,6 +1955,9 @@
     function cleanupResources() {
       isRunning = false;
       isConnecting = false;
+      isRenewing = false;
+      renewalPending = false;
+      stopSessionTimer();
       releaseWakeLock();
       stopAllPlayingAudio();
       setMicGateVisual(false);
@@ -1519,12 +1981,13 @@
     }
 
     function stopSession() {
+      const oldWs = ws;
+      ws = null;
       cleanupResources();
-      if (ws) {
-        if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
-          ws.close(1000, "User stopped");
+      if (oldWs) {
+        if (oldWs.readyState === WebSocket.OPEN || oldWs.readyState === WebSocket.CONNECTING) {
+          oldWs.close(1000, "User stopped");
         }
-        ws = null;
       }
       setStatus("대기 중", "normal");
     }
