@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230284c7'/%3E%3Ctext x='50' y='66' font-size='52' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'%3E譯%3C/text%3E%3C/svg%3E" />
-  <title>AI 초저지연 실시간 동시통역기</title>
+  <title>AI 이중 파이프라인 실시간 동시통역기</title>
   <style>
     * {
       box-sizing: border-box;
@@ -26,14 +26,14 @@
     }
     header {
       background-color: #1e293b;
-      padding: 11px 16px;
+      padding: 10px 14px;
       display: flex;
       justify-content: space-between;
       align-items: center;
       border-bottom: 1px solid #334155;
     }
     header h1 {
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 700;
       color: #38bdf8;
     }
@@ -45,11 +45,11 @@
     .header-right {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
     }
     .tier-badge {
       font-size: 11px;
-      padding: 4px 8px;
+      padding: 4px 7px;
       border-radius: 6px;
       font-weight: 700;
       background-color: #1e3a8a;
@@ -63,8 +63,8 @@
       border-color: #d97706;
     }
     .status-badge {
-      font-size: 12px;
-      padding: 4px 9px;
+      font-size: 11px;
+      padding: 4px 8px;
       border-radius: 999px;
       background-color: #334155;
       color: #cbd5e1;
@@ -75,8 +75,8 @@
       color: #6ee7b7;
     }
     .status-badge.speaking {
-      background-color: #9a3412;
-      color: #fed7aa;
+      background-color: #0369a1;
+      color: #e0f2fe;
     }
     .status-badge.renewing {
       background-color: #4338ca;
@@ -90,14 +90,14 @@
       background: #334155;
       color: #f8fafc;
       border: none;
-      padding: 6px 10px;
+      padding: 5px 9px;
       border-radius: 6px;
-      font-size: 13px;
+      font-size: 12px;
       cursor: pointer;
     }
     .quick-lang-bar {
       background-color: #1e293b;
-      padding: 8px 12px;
+      padding: 7px 12px;
       border-bottom: 1px solid #334155;
       display: grid;
       grid-template-columns: repeat(4, 1fr);
@@ -108,7 +108,7 @@
       color: #94a3b8;
       border: 1px solid #334155;
       border-radius: 8px;
-      padding: 7px 4px;
+      padding: 6px 4px;
       font-size: 13px;
       font-weight: 600;
       cursor: pointer;
@@ -119,11 +119,10 @@
       background-color: #0284c7;
       color: #ffffff;
       border-color: #38bdf8;
-      box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.4);
     }
     .log-toolbar {
       background-color: #162032;
-      padding: 6px 12px;
+      padding: 5px 12px;
       border-bottom: 1px solid #334155;
       display: flex;
       justify-content: space-between;
@@ -133,7 +132,7 @@
     .log-toolbar-left {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
     }
     .session-timer-badge {
       font-size: 11px;
@@ -143,6 +142,14 @@
       padding: 3px 6px;
       border-radius: 4px;
       border: 1px solid #334155;
+    }
+    .pipeline-badge {
+      font-size: 10px;
+      color: #6ee7b7;
+      background-color: #064e3b;
+      padding: 3px 6px;
+      border-radius: 4px;
+      font-weight: 600;
     }
     .log-toolbar-actions {
       display: flex;
@@ -154,7 +161,7 @@
       background-color: #334155;
       color: #e2e8f0;
       border: 1px solid #475569;
-      padding: 4px 8px;
+      padding: 4px 7px;
       border-radius: 6px;
       font-size: 11px;
       font-weight: 600;
@@ -290,26 +297,70 @@
       grid-template-columns: 1fr 1fr;
       gap: 8px;
     }
+    /* 이중 파이프라인 실시간 모니터 (원문 연속 스트림 + 동시통역 연속 스트림) */
+    .dual-live-monitor {
+      background-color: #0b1120;
+      border-bottom: 1px solid #334155;
+      padding: 8px 12px;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 6px;
+    }
+    .monitor-pane {
+      background-color: #162032;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 7px 10px;
+    }
+    .monitor-pane.trans {
+      background-color: #172554;
+      border-color: #2563eb;
+    }
+    .monitor-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      font-weight: 700;
+      color: #94a3b8;
+      margin-bottom: 3px;
+    }
+    .monitor-pane.trans .monitor-head {
+      color: #7dd3fc;
+    }
+    .monitor-text {
+      font-size: 13px;
+      line-height: 1.45;
+      color: #e2e8f0;
+      max-height: 44px;
+      overflow-y: auto;
+      word-break: keep-all;
+    }
+    .monitor-pane.trans .monitor-text {
+      font-size: 15px;
+      font-weight: 600;
+      color: #ffffff;
+    }
     .transcript-container {
       flex: 1;
-      padding: 14px 16px;
+      padding: 12px 14px;
       overflow-y: auto;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 10px;
     }
     .bubble {
-      padding: 12px 14px;
+      padding: 10px 13px;
       border-radius: 12px;
-      line-height: 1.55;
-      font-size: 16px;
+      line-height: 1.5;
+      font-size: 15px;
       word-break: keep-all;
-      animation: fadeIn 0.2s ease;
+      animation: fadeIn 0.18s ease;
     }
     .bubble.system {
       background-color: #1e293b;
       color: #94a3b8;
-      font-size: 13px;
+      font-size: 12px;
       text-align: center;
     }
     .bubble.error-diag {
@@ -342,18 +393,23 @@
       font-size: 12px;
       margin-top: 4px;
     }
-    .bubble.user-speech {
+    .bubble.chunk-pair {
       background-color: #1e293b;
-      border-left: 3px solid #64748b;
-      color: #cbd5e1;
-      font-size: 14px;
-    }
-    .bubble.translated-out {
-      background-color: #172554;
       border-left: 4px solid #38bdf8;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .chunk-orig-line {
+      font-size: 13px;
+      color: #94a3b8;
+      border-bottom: 1px dashed #334155;
+      padding-bottom: 4px;
+    }
+    .chunk-trans-line {
+      font-size: 17px;
+      font-weight: 600;
       color: #ffffff;
-      font-size: 18px;
-      font-weight: 500;
     }
     .bubble.summary-card {
       background-color: #1e1b4b;
@@ -385,7 +441,6 @@
       font-weight: 600;
       cursor: pointer;
       text-align: center;
-      transition: all 0.15s ease;
     }
     .btn-summary-copy.foreign {
       background-color: #064e3b;
@@ -401,17 +456,16 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 4px;
+      margin-bottom: 2px;
     }
     .bubble-label {
       font-size: 11px;
       color: #7dd3fc;
-      font-weight: 600;
+      font-weight: 700;
     }
     .bubble.summary-card .bubble-label {
       color: #a5b4fc;
       font-size: 12px;
-      font-weight: 700;
     }
     .bubble-time {
       font-size: 10px;
@@ -419,11 +473,11 @@
     }
     .controls {
       background-color: #1e293b;
-      padding: 10px 16px 16px 16px;
+      padding: 9px 14px 15px 14px;
       border-top: 1px solid #334155;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 7px;
     }
     .mic-gate-row {
       display: flex;
@@ -453,8 +507,8 @@
     }
     .mic-state-label {
       font-size: 11px;
-      color: #94a3b8;
-      min-width: 104px;
+      color: #6ee7b7;
+      min-width: 112px;
       text-align: right;
       font-weight: 600;
     }
@@ -473,7 +527,7 @@
       background-color: #0f172a;
       border: 1px solid #475569;
       color: #f8fafc;
-      padding: 8px 10px;
+      padding: 7px 10px;
       border-radius: 8px;
       font-size: 13px;
     }
@@ -490,8 +544,8 @@
     }
     .mode-status-bar {
       width: 100%;
-      padding: 9px 12px;
-      border-radius: 10px;
+      padding: 8px 12px;
+      border-radius: 9px;
       border: 1px solid #0284c7;
       background-color: #0f172a;
       color: #e0f2fe;
@@ -504,7 +558,7 @@
     }
     .mode-pill {
       font-size: 11px;
-      padding: 3px 8px;
+      padding: 2px 7px;
       border-radius: 6px;
       background-color: #0369a1;
       color: #ffffff;
@@ -561,8 +615,8 @@
 
   <header>
     <div>
-      <h1>AI 초저지연 실시간 동시통역</h1>
-      <div class="header-sub">연속 링버퍼 엔진 · 고속 VAD · 이중언어 회의록</div>
+      <h1>AI 이중 파이프라인 동시통역</h1>
+      <div class="header-sub">채널1 연속원문기록 + 채널2 2초 직독직해 음성송출</div>
     </div>
     <div class="header-right">
       <span id="headerTierBadge" class="tier-badge">무료 키</span>
@@ -580,7 +634,8 @@
 
   <div class="log-toolbar">
     <div class="log-toolbar-left">
-      <span id="sessionTimerBadge" class="session-timer-badge" title="현재 세션 경과 시간 (12분마다 자동 갱신)">00:00</span>
+      <span id="sessionTimerBadge" class="session-timer-badge" title="총 경과 시간">00:00</span>
+      <span id="pipelineStatusBadge" class="pipeline-badge">2초 슬라이딩 병렬</span>
     </div>
     <div class="log-toolbar-actions">
       <button id="summarizeBtn" class="btn-tool summary-btn" type="button">이중언어 요약</button>
@@ -632,28 +687,28 @@
         </select>
       </div>
       <div class="field-group">
-        <label for="autoModeSelect">통역 작동 방식</label>
+        <label for="autoModeSelect">통역 방향 설정</label>
         <select id="autoModeSelect">
-          <option value="auto_both">완전 자동 양방향 (누를 필요 없음)</option>
-          <option value="to_ko_only">상대방 말 듣기 고정 (외국어→한국어)</option>
-          <option value="from_ko_only">내 말 전달 고정 (한국어→외국어)</option>
+          <option value="auto_both">완전 자동 양방향 (한국어 ↔ 상대언어)</option>
+          <option value="to_ko_only">상대방 말 듣기 전용 (외국어 → 한국어)</option>
+          <option value="from_ko_only">내 말 전달 전용 (한국어 → 외국어)</option>
         </select>
       </div>
     </div>
     <div class="row-2">
       <div class="field-group">
-        <label for="vadSpeedSelect">동시통역 반응 속도 (침묵 판정)</label>
-        <select id="vadSpeedSelect">
-          <option value="250">초고속 동시통역 (0.25초 반응)</option>
-          <option value="450">균형 모드 (0.45초 반응)</option>
-          <option value="750">문장 완성 대기 (0.75초 반응)</option>
+        <label for="chunkIntervalSelect">동시통역 슬라이딩 주기 (시차 조절)</label>
+        <select id="chunkIntervalSelect">
+          <option value="1600">초고속 1.6초 단위 (최소 지연)</option>
+          <option value="2000" selected>표준 2.0초 단위 (동시통역 권장)</option>
+          <option value="2600">안정 2.6초 단위 (긴 구절 문맥)</option>
         </select>
       </div>
       <div class="field-group">
-        <label for="echoGuardSelect">오디오 환경 및 에코 차단</label>
-        <select id="echoGuardSelect">
-          <option value="speaker">스피커 모드 (음성 출력 중 에코 차단)</option>
-          <option value="earphone">이어폰/시스템오디오 (동시 송수신)</option>
+        <label for="duplexModeSelect">오디오 송수신 방식 (에코 제어)</label>
+        <select id="duplexModeSelect">
+          <option value="full_duplex">동시 송수신 유지 (이어폰/시스템오디오 권장)</option>
+          <option value="speaker_duck">스피커 감쇠 모드 (송출 중 입력 민감도 조절)</option>
         </select>
       </div>
     </div>
@@ -661,8 +716,8 @@
       <div class="field-group">
         <label for="voiceOutputSelect">음성 출력 설정</label>
         <select id="voiceOutputSelect">
-          <option value="on">즉시 음성 출력 + 화면 문자 기록</option>
-          <option value="off">무음 모드 (화면 문자만 기록)</option>
+          <option value="on">2초 단위 동시 음성 출력 + 화면 기록</option>
+          <option value="off">무음 모드 (실시간 자막만 기록)</option>
         </select>
       </div>
       <div class="field-group">
@@ -676,18 +731,17 @@
     </div>
     <div class="row-2">
       <div class="field-group">
-        <label for="modelInput">실시간 네이티브 음성 모델 ID</label>
+        <label for="modelInput">실시간 음성 엔진 모델 ID</label>
         <input type="text" id="modelInput" list="liveModelList" value="gemini-2.5-flash-native-audio-preview-12-2025" />
         <datalist id="liveModelList">
           <option value="gemini-2.5-flash-native-audio-preview-12-2025"></option>
           <option value="gemini-3.8-live"></option>
           <option value="gemini-3.1-flash-live-preview"></option>
-          <option value="gemini-3.5-live-translate-preview"></option>
           <option value="gemini-2.0-flash-exp"></option>
         </datalist>
       </div>
       <div class="field-group">
-        <label for="voiceNameSelect">AI 통역사 목소리</label>
+        <label for="voiceNameSelect">동시통역사 목소리</label>
         <select id="voiceNameSelect">
           <option value="Aoede">Aoede (차분한 여성)</option>
           <option value="Puck">Puck (경쾌한 남성)</option>
@@ -696,32 +750,33 @@
         </select>
       </div>
     </div>
-    <div class="row-2">
-      <div class="field-group">
-        <label for="autoRenewSelect">장시간 무중단 세션 갱신</label>
-        <select id="autoRenewSelect">
-          <option value="on">12분마다 자동 갱신 (15분 제한 방지)</option>
-          <option value="off">자동 갱신 끄기</option>
-        </select>
-      </div>
-      <div class="field-group">
-        <label for="tailGuardSelect">스피커 잔향 보호 시간</label>
-        <select id="tailGuardSelect">
-          <option value="300">짧게 (0.30초 · 빠른 턴 전환)</option>
-          <option value="500">보통 (0.50초 · 실내 울림 방어)</option>
-        </select>
-      </div>
-    </div>
     <div class="field-group">
       <label for="glossaryInput">상황 및 전문 용어집 (선택 입력)</label>
-      <textarea id="glossaryInput" placeholder="예: 학술 세미나 또는 해외 거래처 미팅. 고유명사와 전문 용어를 적어두면 음성 통역과 이중 언어 회의록 요약에 모두 반영됩니다."></textarea>
+      <textarea id="glossaryInput" placeholder="예: 학술 세미나 또는 해외 바이어 미팅. 고유명사와 전문 용어를 적어두면 2초 직독직해 번역과 회의록 요약에 즉시 반영됩니다."></textarea>
+    </div>
+  </section>
+
+  <!-- 상단 고정 실시간 이중 파이프라인 모니터 -->
+  <section class="dual-live-monitor">
+    <div class="monitor-pane">
+      <div class="monitor-head">
+        <span>채널 1 · 실시간 원문 연속 수신 (멈춤 없음)</span>
+        <span id="ch1StateText">대기</span>
+      </div>
+      <div id="liveOriginalStream" class="monitor-text">통역 시작 후 연사가 말하면 원문이 실시간으로 여기에 흐릅니다...</div>
+    </div>
+    <div class="monitor-pane trans">
+      <div class="monitor-head">
+        <span>채널 2 · 2초 단위 직독직해 동시통역 출력</span>
+        <span id="ch2StateText">대기</span>
+      </div>
+      <div id="liveTranslatedStream" class="monitor-text">원문 수신과 동시에 2초 단위로 통역 음성과 문자가 출력됩니다...</div>
     </div>
   </section>
 
   <main id="transcriptBox" class="transcript-container">
     <div class="bubble system">
-      1024샘플 초고속 캡처와 연속 링 버퍼 재생 엔진이 적용되어 시차와 끊김을 최소화했습니다.<br />
-      통역 시작을 누르고 말씀하시면 구절 단위로 즉시 매끄러운 음성이 출력됩니다.
+      이어폰을 한쪽 귀에 착용한 상태로 통역 시작을 누르시면 마이크가 닫히지 않고 100% 열려 있어, 연사가 계속 말하는 중에도 2초 시차로 원문 기록과 동시 음성 통역이 동시에 진행됩니다.
     </div>
   </main>
 
@@ -733,16 +788,16 @@
       <span id="micStateLabel" class="mic-state-label">오디오 대기</span>
     </div>
     <div class="text-send-row">
-      <input type="text" id="manualTextInput" placeholder="마이크 없을 때 여기에 입력 후 전송하면 음성 통역 출력..." />
+      <input type="text" id="manualTextInput" placeholder="직접 문장을 입력해 즉시 동시통역 음성으로 내보내기..." />
       <button type="button" id="sendTextBtn" class="btn-text-send">음성 전송</button>
     </div>
-    <div id="modeStatusBar" class="mode-status-bar" title="탭하면 자동/수동 고정 모드를 바꿀 수 있습니다">
-      <span id="modeStatusText">완전 자동 양방향: 한국어 ↔ 영어 즉시 음성통역</span>
-      <span class="mode-pill">자동 감지</span>
+    <div id="modeStatusBar" class="mode-status-bar" title="탭하면 양방향/단방향 고정을 전환합니다">
+      <span id="modeStatusText">이중 파이프라인 양방향: 한국어 ↔ 영어 (2.0초 주기)</span>
+      <span class="mode-pill">동시 송수신</span>
     </div>
     <div class="btn-row">
       <button id="mainActionBtn" class="btn-main btn-start">통역 시작</button>
-      <button id="sysAudioBtn" class="btn-sys-audio" type="button" title="PC 브라우저 탭이나 시스템 오디오를 직접 캡처해 통역합니다">탭 소리 입력</button>
+      <button id="sysAudioBtn" class="btn-sys-audio" type="button" title="PC 브라우저 탭이나 시스템 오디오를 직접 캡처해 동시통역합니다">탭 소리 입력</button>
       <button id="clearBtn" class="btn-clear">지우기</button>
     </div>
   </footer>
@@ -759,10 +814,8 @@
 
     const partnerLangSelect = document.getElementById("partnerLangSelect");
     const autoModeSelect = document.getElementById("autoModeSelect");
-    const vadSpeedSelect = document.getElementById("vadSpeedSelect");
-    const echoGuardSelect = document.getElementById("echoGuardSelect");
-    const autoRenewSelect = document.getElementById("autoRenewSelect");
-    const tailGuardSelect = document.getElementById("tailGuardSelect");
+    const chunkIntervalSelect = document.getElementById("chunkIntervalSelect");
+    const duplexModeSelect = document.getElementById("duplexModeSelect");
     const voiceOutputSelect = document.getElementById("voiceOutputSelect");
     const toneSelect = document.getElementById("toneSelect");
     const modelInput = document.getElementById("modelInput");
@@ -773,6 +826,11 @@
     const quickLangBtns = document.querySelectorAll(".quick-lang-btn");
     const statusBadge = document.getElementById("statusBadge");
     const sessionTimerBadge = document.getElementById("sessionTimerBadge");
+    const pipelineStatusBadge = document.getElementById("pipelineStatusBadge");
+    const liveOriginalStream = document.getElementById("liveOriginalStream");
+    const liveTranslatedStream = document.getElementById("liveTranslatedStream");
+    const ch1StateText = document.getElementById("ch1StateText");
+    const ch2StateText = document.getElementById("ch2StateText");
     const transcriptBox = document.getElementById("transcriptBox");
     const summarizeBtn = document.getElementById("summarizeBtn");
     const shareLogBtn = document.getElementById("shareLogBtn");
@@ -798,28 +856,43 @@
     const AUTO_RENEW_SECONDS = 720;
 
     let activeKeyTier = "free";
-    let ws = null;
     let isRunning = false;
     let isConnecting = false;
     let isRenewing = false;
-    let renewalPending = false;
-    let isAiTurnActive = false;
-    let isAiSpeaking = false;
     let hasAudioInputSource = false;
     let audioSourceMode = "none";
-    let echoGuardTimer = null;
+
+    // 이중 파이프라인 WebSocket 인스턴스
+    let wsListener = null; // 채널 1: 연속 원문 청취 및 전사
+    let wsSpeaker = null;  // 채널 2: 연속 음성 합성 송출
+
+    // 2초 슬라이딩 청크 파이프라인 상태
+    let pendingTranscriptBuffer = "";
+    let lastTranscriptReceivedAt = 0;
+    let slidingChunkTimer = null;
+    let chunkSequenceCounter = 0; // 1부터 시작
+    let nextExpectedPlaySeq = 1;  // 1부터 시작
+    let completedChunkResults = new Map();
+    let recentTranslatedHistory = [];
+    let speakerSpeechQueue = [];
+    let isSpeakerBusy = false;
+
+    // 2.2초 직접 오디오 백업 청커 (전사 지연 시 즉각 작동)
+    let pcmBackupSamples = [];
+    let pcmBackupActiveVoiceSamples = 0;
+    let isBackupPcmInFlight = false;
+
     let sessionInterval = null;
     let sessionElapsedSec = 0;
     let totalElapsedSec = 0;
-    let reconnectAttemptCount = 0;
-    let disableAdvancedVad = false;
+    let isAiSpeaking = false;
 
     let micStream = null;
     let inputAudioCtx = null;
     let processorNode = null;
     let muteGainNode = null;
 
-    // 연속 링 버퍼 오디오 재생 엔진 변수
+    // 연속 링 버퍼 오디오 재생 엔진
     let outputAudioCtx = null;
     let playbackScriptNode = null;
     let ringBuffer = null;
@@ -831,8 +904,6 @@
     let ringMinPrebufferSamples = 0;
 
     let wakeLock = null;
-    let currentTranslatedBubble = null;
-    let currentUserBubble = null;
 
     window.addEventListener("DOMContentLoaded", () => {
       const legacyKey = localStorage.getItem("gemini_rt_api_key");
@@ -842,10 +913,8 @@
 
       const savedPartner = localStorage.getItem("gemini_rt_partner_lang");
       const savedAutoMode = localStorage.getItem("gemini_rt_auto_mode");
-      const savedVadSpeed = localStorage.getItem("gemini_rt_vad_speed");
-      const savedEchoGuard = localStorage.getItem("gemini_rt_echo_guard");
-      const savedAutoRenew = localStorage.getItem("gemini_rt_auto_renew");
-      const savedTailGuard = localStorage.getItem("gemini_rt_tail_guard");
+      const savedChunkMs = localStorage.getItem("gemini_rt_chunk_ms");
+      const savedDuplex = localStorage.getItem("gemini_rt_duplex_mode");
       const savedVoiceOut = localStorage.getItem("gemini_rt_voice_out");
       const savedTone = localStorage.getItem("gemini_rt_tone");
       const savedModel = localStorage.getItem("gemini_rt_model");
@@ -861,14 +930,11 @@
       }
       if (savedPartner) partnerLangSelect.value = savedPartner;
       if (savedAutoMode) autoModeSelect.value = savedAutoMode;
-      if (savedVadSpeed) vadSpeedSelect.value = savedVadSpeed;
-      if (savedEchoGuard) echoGuardSelect.value = savedEchoGuard;
-      if (savedAutoRenew) autoRenewSelect.value = savedAutoRenew;
-      if (savedTailGuard) tailGuardSelect.value = savedTailGuard;
+      if (savedChunkMs) chunkIntervalSelect.value = savedChunkMs;
+      if (savedDuplex) duplexModeSelect.value = savedDuplex;
       if (savedVoiceOut) voiceOutputSelect.value = savedVoiceOut;
       if (savedTone) toneSelect.value = savedTone;
       if (savedModel) {
-        // 구형 exp 모델이 저장되어 있던 경우 최신 네이티브 오디오 모델로 자동 업그레이드
         modelInput.value = savedModel === "gemini-2.0-flash-exp"
           ? "gemini-2.5-flash-native-audio-preview-12-2025"
           : savedModel;
@@ -887,10 +953,8 @@
       localStorage.setItem("gemini_rt_active_tier", activeKeyTier);
       localStorage.setItem("gemini_rt_partner_lang", partnerLangSelect.value);
       localStorage.setItem("gemini_rt_auto_mode", autoModeSelect.value);
-      localStorage.setItem("gemini_rt_vad_speed", vadSpeedSelect.value);
-      localStorage.setItem("gemini_rt_echo_guard", echoGuardSelect.value);
-      localStorage.setItem("gemini_rt_auto_renew", autoRenewSelect.value);
-      localStorage.setItem("gemini_rt_tail_guard", tailGuardSelect.value);
+      localStorage.setItem("gemini_rt_chunk_ms", chunkIntervalSelect.value);
+      localStorage.setItem("gemini_rt_duplex_mode", duplexModeSelect.value);
       localStorage.setItem("gemini_rt_voice_out", voiceOutputSelect.value);
       localStorage.setItem("gemini_rt_tone", toneSelect.value);
       localStorage.setItem("gemini_rt_model", modelInput.value.trim());
@@ -927,8 +991,8 @@
       updateTierUI();
 
       if (isRunning) {
-        addSystemMessage(`API 키 등급이 [${newTier === "free" ? "무료 키" : "유료 키"}]로 변경되었습니다. 새 키로 무중단 전환합니다.`);
-        triggerSeamlessRenewal("등급 전환");
+        addSystemMessage(`API 키 등급이 [${newTier === "free" ? "무료 키" : "유료 키"}]로 변경되었습니다. 이중 파이프라인을 새 키로 무중단 재연결합니다.`);
+        renewDualPipelines("등급 전환");
       }
     }
 
@@ -944,11 +1008,6 @@
     paidApiKeyInput.addEventListener("input", () => {
       saveSettings();
       if (activeKeyTier === "paid") updateTierUI();
-    });
-
-    modelInput.addEventListener("change", () => {
-      disableAdvancedVad = false;
-      saveSettings();
     });
 
     document.querySelectorAll(".btn-key-toggle").forEach((btn) => {
@@ -1042,10 +1101,6 @@
       updateModeStatusUI();
 
       if (isRunning) {
-        stopAllPlayingAudio();
-        currentTranslatedBubble = null;
-        currentUserBubble = null;
-        sendRuleUpdateSignal();
         const partnerKoName = LANG_NAMES[langCode].ko;
         addSystemMessage(`상대방 언어가 [${partnerKoName}]로 즉시 전환되었습니다.`);
       }
@@ -1056,17 +1111,18 @@
     });
 
     partnerLangSelect.addEventListener("change", () => selectPartnerLanguage(partnerLangSelect.value));
-    echoGuardSelect.addEventListener("change", () => saveSettings());
-    autoRenewSelect.addEventListener("change", () => saveSettings());
-    vadSpeedSelect.addEventListener("change", () => saveSettings());
-    tailGuardSelect.addEventListener("change", () => saveSettings());
+    duplexModeSelect.addEventListener("change", () => saveSettings());
+    chunkIntervalSelect.addEventListener("change", () => {
+      saveSettings();
+      updateModeStatusUI();
+      if (isRunning) {
+        restartSlidingChunkLoop();
+      }
+    });
 
     autoModeSelect.addEventListener("change", () => {
       saveSettings();
       updateModeStatusUI();
-      if (isRunning) {
-        sendRuleUpdateSignal();
-      }
     });
 
     modeStatusBar.addEventListener("click", () => {
@@ -1076,25 +1132,26 @@
       saveSettings();
       updateModeStatusUI();
       if (isRunning) {
-        sendRuleUpdateSignal();
-        addSystemMessage(`통역 작동 방식 변경: ${modeStatusText.textContent}`);
+        addSystemMessage(`통역 방향 변경: ${modeStatusText.textContent}`);
       }
     });
 
     function updateModeStatusUI() {
       const partnerKoName = LANG_NAMES[partnerLangSelect.value].ko;
       const mode = autoModeSelect.value;
+      const secLabel = (parseInt(chunkIntervalSelect.value, 10) / 1000).toFixed(1) + "초";
       const pill = modeStatusBar.querySelector(".mode-pill");
+      pipelineStatusBadge.textContent = `${secLabel} 슬라이딩 병렬`;
 
       if (mode === "auto_both") {
-        modeStatusText.textContent = `완전 자동 양방향: 한국어 ↔ ${partnerKoName} 즉시 음성통역`;
-        pill.textContent = "자동 감지";
+        modeStatusText.textContent = `이중 파이프라인 양방향: 한국어 ↔ ${partnerKoName} (${secLabel} 주기)`;
+        pill.textContent = "동시 송수신";
       } else if (mode === "to_ko_only") {
-        modeStatusText.textContent = `듣기 고정: ${partnerKoName}(외국어) → 한국어 음성통역`;
-        pill.textContent = "듣기 고정";
+        modeStatusText.textContent = `듣기 전용 동시통역: ${partnerKoName} → 한국어 (${secLabel} 주기)`;
+        pill.textContent = "듣기 전용";
       } else {
-        modeStatusText.textContent = `말하기 고정: 한국어 → ${partnerKoName} 음성통역`;
-        pill.textContent = "말하기 고정";
+        modeStatusText.textContent = `말하기 전용 동시통역: 한국어 → ${partnerKoName} (${secLabel} 주기)`;
+        pill.textContent = "말하기 전용";
       }
     }
 
@@ -1116,12 +1173,8 @@
         totalElapsedSec += 1;
         sessionTimerBadge.textContent = formatDuration(totalElapsedSec);
 
-        if (autoRenewSelect.value === "on" && sessionElapsedSec >= AUTO_RENEW_SECONDS && !isRenewing) {
-          if (!isAiTurnActive && !isAiSpeaking && ringAvailableSamples === 0) {
-            triggerSeamlessRenewal("12분 주기 자동 갱신");
-          } else {
-            renewalPending = true;
-          }
+        if (sessionElapsedSec >= AUTO_RENEW_SECONDS && !isRenewing) {
+          renewDualPipelines("12분 주기 무중단 자동 갱신");
         }
       }, 1000);
     }
@@ -1133,33 +1186,18 @@
       }
     }
 
-    function getRecentConversationSummary() {
-      const bubbles = Array.from(transcriptBox.querySelectorAll(".bubble:not(.system):not(.error-diag):not(.summary-card)"));
-      if (bubbles.length === 0) return "";
-      const recent = bubbles.slice(-6);
-      const lines = recent.map((b) => {
-        const label = b.querySelector(".bubble-label")?.textContent.trim() || "";
-        const content = b.querySelector(".bubble-content")?.textContent.trim() || "";
-        return content ? `${label}: ${content}` : "";
-      }).filter(Boolean);
-      return lines.join("\n");
-    }
-
-    function triggerSeamlessRenewal(reasonLabel = "자동 갱신") {
+    function renewDualPipelines(reasonLabel) {
       if (!isRunning || isRenewing) return;
       isRenewing = true;
-      renewalPending = false;
-      currentTranslatedBubble = null;
-      currentUserBubble = null;
-      setStatus("세션 무중단 갱신", "renewing");
+      setStatus("파이프라인 갱신", "renewing");
 
-      const recentContext = getRecentConversationSummary();
-
-      if (ws) {
-        try {
-          ws.close(1000, "Seamless renewal");
-        } catch (e) {}
-        ws = null;
+      if (wsListener) {
+        try { wsListener.close(1000, "Renew listener"); } catch (e) {}
+        wsListener = null;
+      }
+      if (wsSpeaker) {
+        try { wsSpeaker.close(1000, "Renew speaker"); } catch (e) {}
+        wsSpeaker = null;
       }
 
       setTimeout(() => {
@@ -1167,11 +1205,11 @@
           isRenewing = false;
           return;
         }
-        connectWebSocket(true, recentContext, reasonLabel);
+        connectDualWebSockets(true, reasonLabel);
       }, 150);
     }
 
-    function setMicGateVisual(muted) {
+    function updateAudioGateIndicator() {
       volumeFill.classList.remove("muted", "no-mic");
       micStateLabel.classList.remove("muted", "no-mic");
 
@@ -1180,20 +1218,18 @@
         micStateLabel.textContent = "오디오 대기";
         return;
       }
-
       if (!hasAudioInputSource || audioSourceMode === "none") {
         volumeFill.classList.add("no-mic");
         micStateLabel.classList.add("no-mic");
         micStateLabel.textContent = "무마이크·텍스트";
         return;
       }
-
-      if (muted) {
+      if (isAiSpeaking && duplexModeSelect.value === "speaker_duck") {
         volumeFill.classList.add("muted");
         micStateLabel.classList.add("muted");
-        micStateLabel.textContent = "에코 차단 중";
+        micStateLabel.textContent = "송출 중 감쇠";
       } else {
-        micStateLabel.textContent = audioSourceMode === "system" ? "탭 소리 수신 중" : "음성 수신 중";
+        micStateLabel.textContent = audioSourceMode === "system" ? "탭 소리 연속수신" : "동시 송수신 활성";
       }
     }
 
@@ -1208,15 +1244,15 @@
     }
 
     function collectDialogueOnlyText() {
-      const bubbles = transcriptBox.querySelectorAll(".bubble:not(.system):not(.error-diag):not(.summary-card)");
+      const bubbles = transcriptBox.querySelectorAll(".bubble.chunk-pair");
       if (bubbles.length === 0) return "";
       const lines = [];
       bubbles.forEach((b) => {
-        const label = b.querySelector(".bubble-label")?.textContent.trim() || "";
         const time = b.querySelector(".bubble-time")?.textContent.trim() || "";
-        const content = b.querySelector(".bubble-content")?.textContent.trim() || "";
-        if (content) {
-          lines.push(time ? `[${time}] ${label}: ${content}` : `[${label}]: ${content}`);
+        const orig = b.querySelector(".chunk-orig-line")?.textContent.trim() || "";
+        const trans = b.querySelector(".chunk-trans-line")?.textContent.trim() || "";
+        if (orig || trans) {
+          lines.push(`[${time}] 원문: ${orig}\n통역: ${trans}`);
         }
       });
       return lines.join("\n\n");
@@ -1236,7 +1272,7 @@
         }
       }
       if (dialogueText) {
-        exportParts.push(`[전체 통역 대화 녹취록]\n${dialogueText}`);
+        exportParts.push(`[전체 동시통역 녹취록]\n${dialogueText}`);
       }
       return exportParts.join("\n\n========================================\n\n");
     }
@@ -1302,7 +1338,7 @@
       const partnerInfo = LANG_NAMES[partnerCode];
 
       const summaryPrompt = [
-        `다음은 한국어와 ${partnerInfo.ko}(${partnerInfo.en}) 간 실시간 음성 동시통역으로 기록된 대화 전문입니다.`,
+        `다음은 한국어와 ${partnerInfo.ko}(${partnerInfo.en}) 간 실시간 동시통역으로 기록된 대화 전문입니다.`,
         `이 대화 내용을 면밀히 분석하여 한국어 회의록 요약과 ${partnerInfo.ko}(${partnerInfo.en}) 회의록 요약 두 가지 언어로 나란히 정리한 이중 언어 회의록을 작성해 주세요.`,
         "출력 형식 엄수 규칙:",
         "1. 별표(**)나 샵(#), 하이픈(-) 글머리 기호 같은 마크다운 특수문자를 절대 쓰지 말고 순수 텍스트와 숫자 번호(1., 2., 3., 4.)만 사용해 정리하십시오.",
@@ -1322,35 +1358,31 @@
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            contents: [{
-              role: "user",
-              parts: [{ text: summaryPrompt }]
-            }],
-            generationConfig: {
-              temperature: 0.2
-            }
+            contents: [{ role: "user", parts: [{ text: summaryPrompt }] }],
+            generationConfig: { temperature: 0.2 }
           })
         });
 
         const result = await response.json();
         if (!response.ok || result.error) {
-          const errMsg = result.error ? result.error.message : `HTTP ${response.status}`;
-          throw new Error(errMsg);
+          throw new Error(result.error ? result.error.message : `HTTP ${response.status}`);
         }
 
         const summaryText = result.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-        if (!summaryText) {
-          throw new Error("AI로부터 요약 결과를 받지 못했습니다.");
-        }
+        if (!summaryText) throw new Error("요약 결과를 받지 못했습니다.");
 
         const { koPart, foreignPart } = splitBilingualSummary(summaryText, partnerInfo.native);
 
-        const summaryBubble = createBubbleElement(
-          "summary-card",
-          `이중 언어 회의록 요약 (한국어 + ${partnerInfo.ko} · 경과 ${sessionTimerBadge.textContent})`
-        );
-        const contentSpan = summaryBubble.querySelector(".bubble-content");
-        contentSpan.textContent = summaryText;
+        const summaryBubble = document.createElement("div");
+        summaryBubble.className = "bubble summary-card";
+        summaryBubble.innerHTML = `
+          <div class="bubble-header">
+            <span class="bubble-label">이중 언어 회의록 요약 (한국어 + ${partnerInfo.ko} · 경과 ${sessionTimerBadge.textContent})</span>
+            <span class="bubble-time">${getFormattedTime()}</span>
+          </div>
+          <span class="bubble-content"></span>
+        `;
+        summaryBubble.querySelector(".bubble-content").textContent = summaryText;
 
         const actionRow = document.createElement("div");
         actionRow.className = "summary-card-actions";
@@ -1360,18 +1392,11 @@
         copyKoBtn.className = "btn-summary-copy";
         copyKoBtn.textContent = "한국어 요약만 복사하기";
         copyKoBtn.addEventListener("click", async () => {
-          try {
-            await copyTextFallback(koPart);
-            const prevLabel = copyKoBtn.textContent;
-            copyKoBtn.textContent = "한국어 요약 복사됨";
-            copyKoBtn.classList.add("copied");
-            setTimeout(() => {
-              copyKoBtn.textContent = prevLabel;
-              copyKoBtn.classList.remove("copied");
-            }, 1600);
-          } catch (e) {
-            alert("복사 오류: " + e.message);
-          }
+          await copyTextFallback(koPart);
+          const prev = copyKoBtn.textContent;
+          copyKoBtn.textContent = "한국어 요약 복사됨";
+          copyKoBtn.classList.add("copied");
+          setTimeout(() => { copyKoBtn.textContent = prev; copyKoBtn.classList.remove("copied"); }, 1600);
         });
 
         const copyForeignBtn = document.createElement("button");
@@ -1379,34 +1404,24 @@
         copyForeignBtn.className = "btn-summary-copy foreign";
         copyForeignBtn.textContent = `${partnerInfo.ko} 요약만 복사하기`;
         copyForeignBtn.addEventListener("click", async () => {
-          try {
-            await copyTextFallback(foreignPart);
-            const prevLabel = copyForeignBtn.textContent;
-            copyForeignBtn.textContent = `${partnerInfo.ko} 요약 복사됨`;
-            copyForeignBtn.classList.add("copied");
-            setTimeout(() => {
-              copyForeignBtn.textContent = prevLabel;
-              copyForeignBtn.classList.remove("copied");
-            }, 1600);
-          } catch (e) {
-            alert("복사 오류: " + e.message);
-          }
+          await copyTextFallback(foreignPart);
+          const prev = copyForeignBtn.textContent;
+          copyForeignBtn.textContent = `${partnerInfo.ko} 요약 복사됨`;
+          copyForeignBtn.classList.add("copied");
+          setTimeout(() => { copyForeignBtn.textContent = prev; copyForeignBtn.classList.remove("copied"); }, 1600);
         });
 
         actionRow.appendChild(copyKoBtn);
         actionRow.appendChild(copyForeignBtn);
         summaryBubble.appendChild(actionRow);
-
+        transcriptBox.appendChild(summaryBubble);
         transcriptBox.scrollTop = transcriptBox.scrollHeight;
 
         summarizeBtn.textContent = "요약 완료";
         summarizeBtn.classList.add("success");
-        setTimeout(() => {
-          summarizeBtn.textContent = origBtnText;
-          summarizeBtn.classList.remove("success");
-        }, 1800);
+        setTimeout(() => { summarizeBtn.textContent = origBtnText; summarizeBtn.classList.remove("success"); }, 1800);
       } catch (err) {
-        alert("이중 언어 회의록 요약 생성 중 오류가 발생했습니다:\n" + err.message);
+        alert("이중 언어 회의록 요약 오류:\n" + err.message);
         summarizeBtn.textContent = origBtnText;
       } finally {
         summarizeBtn.disabled = false;
@@ -1419,41 +1434,22 @@
         alert("공유할 회의록 요약이나 대화 기록이 없습니다.");
         return;
       }
-
       const partnerInfo = LANG_NAMES[partnerLangSelect.value];
-      const shareTitle = `AI 이중 언어 통역 회의록 (한국어·${partnerInfo.ko} / ${new Date().toLocaleDateString("ko-KR")})`;
+      const shareTitle = `AI 이중 언어 동시통역 회의록 (한국어·${partnerInfo.ko} / ${new Date().toLocaleDateString("ko-KR")})`;
       const fullShareBody = `${shareTitle}\n\n${text}`;
 
       if (navigator.share) {
         try {
-          await navigator.share({
-            title: shareTitle,
-            text: fullShareBody
-          });
-          const origText = shareLogBtn.textContent;
-          shareLogBtn.textContent = "공유됨";
-          shareLogBtn.classList.add("success");
-          setTimeout(() => {
-            shareLogBtn.textContent = origText;
-            shareLogBtn.classList.remove("success");
-          }, 1600);
+          await navigator.share({ title: shareTitle, text: fullShareBody });
         } catch (err) {
           if (err.name !== "AbortError") {
-            try {
-              await copyTextFallback(fullShareBody);
-              alert("앱 직접 공유가 제한되어 전체 내용을 클립보드에 대신 복사했습니다.");
-            } catch (copyErr) {
-              alert("공유 중 오류가 발생했습니다: " + err.message);
-            }
+            await copyTextFallback(fullShareBody);
+            alert("전체 내용을 클립보드에 복사했습니다. 카카오톡이나 메일에 붙여넣으세요.");
           }
         }
       } else {
-        try {
-          await copyTextFallback(fullShareBody);
-          alert("PC 브라우저에서는 전체 내용을 클립보드에 복사했습니다. 메신저나 메일 창에 바로 붙여넣으세요.");
-        } catch (err) {
-          alert("복사 오류: " + err.message);
-        }
+        await copyTextFallback(fullShareBody);
+        alert("전체 내용을 클립보드에 복사했습니다. 메신저나 메일 창에 바로 붙여넣으세요.");
       }
     });
 
@@ -1463,18 +1459,11 @@
         alert("복사할 대화 기록이 없습니다.");
         return;
       }
-      try {
-        await copyTextFallback(text);
-        const origText = copyLogBtn.textContent;
-        copyLogBtn.textContent = "복사됨";
-        copyLogBtn.classList.add("success");
-        setTimeout(() => {
-          copyLogBtn.textContent = origText;
-          copyLogBtn.classList.remove("success");
-        }, 1600);
-      } catch (err) {
-        alert("복사 오류: " + err.message);
-      }
+      await copyTextFallback(text);
+      const orig = copyLogBtn.textContent;
+      copyLogBtn.textContent = "복사됨";
+      copyLogBtn.classList.add("success");
+      setTimeout(() => { copyLogBtn.textContent = orig; copyLogBtn.classList.remove("success"); }, 1600);
     });
 
     downloadTxtBtn.addEventListener("click", () => {
@@ -1483,25 +1472,22 @@
         alert("저장할 대화 기록이 없습니다.");
         return;
       }
-      const headerInfo = `=== AI 초저지연 실시간 동시통역 이중 언어 회의록 (${new Date().toLocaleString("ko-KR")}) ===\n\n`;
+      const headerInfo = `=== AI 이중 파이프라인 실시간 동시통역 기록 (${new Date().toLocaleString("ko-KR")}) ===\n\n`;
       const fullContent = "\uFEFF" + headerInfo + text + "\n";
       const blob = new Blob([fullContent], { type: "text/plain;charset=utf-8" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `이중언어_통역회의록_${getFileTimestamp()}.txt`;
+      a.download = `동시통역_회의록_${getFileTimestamp()}.txt`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      const origText = downloadTxtBtn.textContent;
+      const orig = downloadTxtBtn.textContent;
       downloadTxtBtn.textContent = "저장됨";
       downloadTxtBtn.classList.add("success");
-      setTimeout(() => {
-        downloadTxtBtn.textContent = origText;
-        downloadTxtBtn.classList.remove("success");
-      }, 1600);
+      setTimeout(() => { downloadTxtBtn.textContent = orig; downloadTxtBtn.classList.remove("success"); }, 1600);
     });
 
     toggleSettingsBtn.addEventListener("click", () => settingsPanel.classList.toggle("hidden"));
@@ -1511,34 +1497,21 @@
         if (!confirm("화면에 표시된 대화 및 회의록 요약 기록을 모두 지우시겠습니까?")) return;
       }
       transcriptBox.innerHTML = "";
-      currentTranslatedBubble = null;
-      currentUserBubble = null;
+      liveOriginalStream.textContent = "대기 중...";
+      liveTranslatedStream.textContent = "대기 중...";
+      recentTranslatedHistory = [];
     });
 
     function sendManualTextForTranslation() {
       const text = manualTextInput.value.trim();
       if (!text) return;
-
-      if (!isRunning || !ws || ws.readyState !== WebSocket.OPEN) {
-        alert("먼저 하단의 통역 시작 버튼을 눌러 서버에 연결해 주세요.");
+      if (!isRunning) {
+        alert("먼저 하단의 통역 시작 버튼을 눌러 파이프라인을 실행해 주세요.");
         return;
       }
-
       initContinuousPlaybackEngine();
-      const userBubble = createBubbleElement("user-speech", "직접 입력 원문", "#94a3b8");
-      userBubble.querySelector(".bubble-content").textContent = text;
-      transcriptBox.scrollTop = transcriptBox.scrollHeight;
-
-      ws.send(JSON.stringify({
-        clientContent: {
-          turns: [{
-            role: "user",
-            parts: [{ text: text }]
-          }],
-          turnComplete: true
-        }
-      }));
-
+      const seqId = ++chunkSequenceCounter;
+      dispatchParallelTextChunk(seqId, text);
       manualTextInput.value = "";
     }
 
@@ -1552,38 +1525,29 @@
 
     sysAudioBtn.addEventListener("click", async () => {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-        alert("현재 브라우저에서는 탭·시스템 오디오 캡처를 지원하지 않습니다. PC 크롬 또는 엣지 브라우저를 사용해 주세요.");
+        alert("PC 크롬 또는 엣지 브라우저에서 탭·시스템 오디오 캡처를 지원합니다.");
         return;
       }
-
       initContinuousPlaybackEngine();
-
       try {
-        const displayStream = await navigator.mediaDevices.getDisplayMedia({
-          video: true,
-          audio: true
-        });
-
-        displayStream.getVideoTracks().forEach((track) => track.stop());
+        const displayStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+        displayStream.getVideoTracks().forEach((t) => t.stop());
         const audioTracks = displayStream.getAudioTracks();
-
         if (audioTracks.length === 0) {
-          alert("선택한 창이나 탭에 오디오 공유가 체크되지 않았습니다. 브라우저 창 하단의 '탭 오디오도 공유' 또는 '시스템 오디오 공유' 스위치를 켜고 다시 선택해 주세요.");
+          alert("공유 창 하단의 '탭 오디오도 공유' 또는 '시스템 오디오 공유' 스위치를 켠 상태로 선택해 주세요.");
           return;
         }
-
         stopCurrentAudioCaptureOnly();
         micStream = new MediaStream(audioTracks);
         hasAudioInputSource = true;
         audioSourceMode = "system";
-
-        echoGuardSelect.value = "earphone";
+        duplexModeSelect.value = "full_duplex";
         saveSettings();
 
         audioTracks[0].onended = () => {
           hasAudioInputSource = false;
           audioSourceMode = "none";
-          setMicGateVisual(false);
+          updateAudioGateIndicator();
           addSystemMessage("PC 탭·시스템 오디오 공유가 종료되었습니다.");
         };
 
@@ -1591,8 +1555,8 @@
           await startSessionWithExistingStream();
         } else {
           startMicCapture();
-          setMicGateVisual(false);
-          addSystemMessage("오디오 입력이 [PC 탭·시스템 오디오]로 전환되었습니다. 재생 중인 영상이나 회의 소리를 실시간으로 통역합니다.");
+          updateAudioGateIndicator();
+          addSystemMessage("채널 1 입력이 [PC 탭·시스템 오디오]로 전환되었습니다.");
         }
       } catch (err) {
         if (err.name !== "NotAllowedError") {
@@ -1610,7 +1574,7 @@
       }
     });
 
-    // 끊김 없는 연속 링 버퍼(Ring Buffer) 재생 엔진 초기화
+    // 연속 링 버퍼(Ring Buffer) 재생 엔진
     function initContinuousPlaybackEngine() {
       try {
         if (!outputAudioCtx || outputAudioCtx.state === "closed") {
@@ -1621,19 +1585,17 @@
         }
 
         const outSampleRate = outputAudioCtx.sampleRate || 48000;
-        if (!ringBuffer || ringCapacity !== outSampleRate * 30) {
-          ringCapacity = outSampleRate * 30; // 최대 30초 분량 연속 버퍼
+        if (!ringBuffer || ringCapacity !== outSampleRate * 40) {
+          ringCapacity = outSampleRate * 40;
           ringBuffer = new Float32Array(ringCapacity);
           ringWritePos = 0;
           ringReadPos = 0;
           ringAvailableSamples = 0;
           ringPrebuffering = true;
-          // 초기 지터 흡수용 0.09초(90ms) 프리버퍼
-          ringMinPrebufferSamples = Math.floor(outSampleRate * 0.09);
+          ringMinPrebufferSamples = Math.floor(outSampleRate * 0.08);
         }
 
         if (!playbackScriptNode) {
-          // 1024 샘플 단위로 오디오 하드웨어 클록에 맞춰 끊김 없이 연속 출력
           playbackScriptNode = outputAudioCtx.createScriptProcessor(1024, 0, 1);
           playbackScriptNode.onaudioprocess = (event) => {
             const output = event.outputBuffer.getChannelData(0);
@@ -1651,15 +1613,17 @@
             if (ringAvailableSamples === 0) {
               output.fill(0);
               ringPrebuffering = true;
-              if (isAiSpeaking && !isAiTurnActive) {
-                scheduleMicReopenAfterPlayback();
+              if (isAiSpeaking) {
+                isAiSpeaking = false;
+                ch2StateText.textContent = "대기";
+                updateAudioGateIndicator();
+                if (isRunning) setStatus("이중 파이프라인 가동", "connected");
               }
               return;
             }
 
             const toRead = Math.min(len, ringAvailableSamples);
             for (let i = 0; i < toRead; i++) {
-              // 1.35배 명료도 증폭 및 소프트 클리핑 방지
               let sample = ringBuffer[ringReadPos] * 1.35;
               if (sample > 0.98) sample = 0.98;
               if (sample < -0.98) sample = -0.98;
@@ -1669,19 +1633,14 @@
             ringAvailableSamples -= toRead;
 
             if (toRead < len) {
-              for (let i = toRead; i < len; i++) {
-                output[i] = 0;
-              }
+              for (let i = toRead; i < len; i++) output[i] = 0;
               ringPrebuffering = true;
-              if (isAiSpeaking && !isAiTurnActive) {
-                scheduleMicReopenAfterPlayback();
-              }
             }
           };
           playbackScriptNode.connect(outputAudioCtx.destination);
         }
       } catch (e) {
-        console.warn("연속 오디오 엔진 초기화 경고:", e);
+        console.warn("연속 오디오 엔진 경고:", e);
       }
     }
 
@@ -1693,18 +1652,10 @@
         outputAudioCtx.resume();
       }
 
-      if (echoGuardTimer) {
-        clearTimeout(echoGuardTimer);
-        echoGuardTimer = null;
-      }
-
       isAiSpeaking = true;
-      if (echoGuardSelect.value === "speaker" && hasAudioInputSource) {
-        setMicGateVisual(true);
-        setStatus("음성 송출 중 (에코 차단)", "speaking");
-      } else {
-        setStatus("실시간 음성 송출 중", "speaking");
-      }
+      ch2StateText.textContent = "음성 송출 중";
+      updateAudioGateIndicator();
+      setStatus("동시통역 음성 송출", "speaking");
 
       const arrayBuffer = base64ToArrayBuffer(base64Data);
       const int16Array = new Int16Array(arrayBuffer);
@@ -1716,7 +1667,6 @@
       const ratio = outRate / inRate;
       const dstLen = Math.round(srcLen * ratio);
 
-      // 24kHz -> 기기 네이티브 샘플레이트(48kHz 등) 선형 보간 업샘플링 후 링 버퍼에 연속 적재
       for (let i = 0; i < dstLen; i++) {
         const srcPos = i / ratio;
         const idx0 = Math.floor(srcPos);
@@ -1740,6 +1690,7 @@
       ringReadPos = 0;
       ringAvailableSamples = 0;
       ringPrebuffering = true;
+      isAiSpeaking = false;
     }
 
     function setStatus(text, type = "normal") {
@@ -1759,156 +1710,16 @@
       transcriptBox.scrollTop = transcriptBox.scrollHeight;
     }
 
-    function analyzeCloseReason(code, reason) {
-      const r = (reason || "").toLowerCase();
-      if (r.includes("not found") || r.includes("bidigeneratecontent") || r.includes("not supported")) {
-        return "해결 처방: 설정창의 [실시간 네이티브 음성 모델 ID]를 목록에 있는 gemini-2.5-flash-native-audio-preview-12-2025 또는 gemini-3.8-live로 변경해 보세요.";
-      }
-      if (r.includes("api key") || r.includes("permission") || r.includes("unauthenticated")) {
-        return "해결 처방: API 키가 잘못되었거나 만료되었습니다. 설정창에서 키 문자열을 다시 확인하세요.";
-      }
-      if (r.includes("referer") || r.includes("origin") || r.includes("blocked")) {
-        return "해결 처방: Google Cloud Console에서 해당 API 키의 [애플리케이션 제한사항]을 '없음'으로 변경해 주세요.";
-      }
-      if (r.includes("quota") || r.includes("resource_exhausted") || code === 1011) {
-        return "해결 처방: 무료 등급의 분당 사용량 한도를 초과했습니다. 잠시 후 다시 시도하거나 상단 배지를 눌러 [유료 키]로 전환하세요.";
-      }
-      if (code === 1008) {
-        return "해결 처방: 정책 위반(1008) 오류입니다. 설정창의 모델 ID와 API 키 권한을 확인해 주세요.";
-      }
-      return "해결 처방: 네트워크 연결 상태와 API 키를 다시 한 번 점검해 주세요.";
-    }
-
     function addErrorDiagnosticMessage(code, reason) {
       const div = document.createElement("div");
       div.className = "bubble error-diag";
-
-      const title = document.createElement("div");
-      title.className = "error-diag-title";
-      title.textContent = `연결 종료 진단 (종료 코드: ${code})`;
-
-      const reasonBox = document.createElement("div");
-      reasonBox.className = "error-diag-reason";
-      reasonBox.textContent = reason && reason.trim()
-        ? `서버 반환 사유: ${reason}`
-        : "서버 반환 사유: 상세 메시지 없음";
-
-      const hint = document.createElement("div");
-      hint.className = "error-diag-hint";
-      hint.textContent = analyzeCloseReason(code, reason);
-
-      div.appendChild(title);
-      div.appendChild(reasonBox);
-      div.appendChild(hint);
+      div.innerHTML = `
+        <div class="error-diag-title">파이프라인 연결 진단 (종료 코드: ${code})</div>
+        <div class="error-diag-reason">${reason ? "서버 반환 사유: " + reason : "상세 사유 없음"}</div>
+        <div class="error-diag-hint">설정창의 API 키와 실시간 음성 모델 ID(gemini-2.5-flash-native-audio-preview-12-2025)를 확인해 주세요.</div>
+      `;
       transcriptBox.appendChild(div);
       transcriptBox.scrollTop = transcriptBox.scrollHeight;
-    }
-
-    function createBubbleElement(typeClass, labelText, labelColor = "") {
-      const bubble = document.createElement("div");
-      bubble.className = `bubble ${typeClass}`;
-
-      const header = document.createElement("div");
-      header.className = "bubble-header";
-
-      const label = document.createElement("span");
-      label.className = "bubble-label";
-      if (labelColor) label.style.color = labelColor;
-      label.textContent = labelText;
-
-      const time = document.createElement("span");
-      time.className = "bubble-time";
-      time.textContent = getFormattedTime();
-
-      header.appendChild(label);
-      header.appendChild(time);
-
-      const content = document.createElement("span");
-      content.className = "bubble-content";
-
-      bubble.appendChild(header);
-      bubble.appendChild(content);
-      transcriptBox.appendChild(bubble);
-      return bubble;
-    }
-
-    function appendTranslatedText(text) {
-      if (!text) return;
-      if (!currentTranslatedBubble) {
-        currentTranslatedBubble = createBubbleElement("translated-out", "음성 통역 출력");
-      }
-      const contentSpan = currentTranslatedBubble.querySelector(".bubble-content");
-      contentSpan.textContent += text;
-      transcriptBox.scrollTop = transcriptBox.scrollHeight;
-    }
-
-    function appendUserTranscript(text) {
-      if (!text) return;
-      if (!currentUserBubble) {
-        const srcLabel = audioSourceMode === "system" ? "시스템 오디오 원문" : "음성 원문 인식";
-        currentUserBubble = createBubbleElement("user-speech", srcLabel, "#94a3b8");
-      }
-      const contentSpan = currentUserBubble.querySelector(".bubble-content");
-      contentSpan.textContent += text;
-      transcriptBox.scrollTop = transcriptBox.scrollHeight;
-    }
-
-    function getDynamicRuleText() {
-      const partnerCode = partnerLangSelect.value;
-      const partnerInfo = LANG_NAMES[partnerCode];
-      const mode = autoModeSelect.value;
-      const tone = toneSelect.value;
-
-      let toneDesc = "자연스럽고 정중한 존댓말(해요체/하십시오체 및 해당 언어의 공손한 회화체)";
-      if (tone === "casual") toneDesc = "자연스럽고 친근한 일상 구어체";
-      if (tone === "formal") toneDesc = "비즈니스 협상, 학술 세미나 및 공식 석상에 적합한 격식체";
-
-      if (mode === "auto_both") {
-        return [
-          `[초저지연 양방향 동시통역 규칙]`,
-          `1. 입력 음성이 한국어(Korean)이면 즉시 ${toneDesc}의 자연스러운 ${partnerInfo.ko}(${partnerInfo.en}) 음성으로 통역하여 말하십시오.`,
-          `2. 입력 음성이 영어(English), 중국어(Chinese), 일본어(Japanese), 스페인어(Spanish) 등 외국어이면 즉시 ${toneDesc}의 자연스러운 한국어(Korean) 음성으로 통역하여 말하십시오.`
-        ].join("\n");
-      } else if (mode === "to_ko_only") {
-        return `[듣기 고정 규칙] 입력되는 영어, 중국어, 일본어, 스페인어 음성을 즉시 ${toneDesc}의 한국어(Korean) 음성으로 통역하여 말하십시오.`;
-      } else {
-        return `[말하기 고정 규칙] 입력되는 한국어(Korean) 음성을 즉시 ${toneDesc}의 ${partnerInfo.ko}(${partnerInfo.en}) 음성으로 통역하여 말하십시오.`;
-      }
-    }
-
-    function buildSystemInstruction(recentContext = "") {
-      const glossary = glossaryInput.value.trim();
-      let prompt = [
-        "당신은 한국어, 영어, 중국어, 일본어, 스페인어를 구사하는 초저지연 실시간 동시통역사입니다.",
-        getDynamicRuleText(),
-        "동시통역 핵심 지침 1: 화자의 긴 연설이 완전히 끝날 때까지 기다리지 말고, 의미가 통하는 구절이나 짧은 문장 단위가 들리는 즉시 지연 없이 바로바로 통역해 발화하십시오.",
-        "동시통역 핵심 지침 2: 질문에 대답하거나 잡담을 하지 말고 오직 들린 문장의 통역 결과만을 즉시 발화하십시오.",
-        "동시통역 핵심 지침 3: '번역해 드리겠습니다', '네 알겠습니다' 같은 인사말이나 부연 설명을 일절 붙이지 마십시오.",
-        "동시통역 핵심 지침 4: 앞뒤 대화 맥락과 생략된 주어를 살려 원어민처럼 매끄럽고 또렷한 속도로 말하십시오."
-      ].join("\n");
-
-      if (glossary) {
-        prompt += `\n[상황 및 필수 용어집]\n${glossary}`;
-      }
-      if (recentContext) {
-        prompt += `\n[직전 대화 맥락 참고용 (이 내용에 대답하지 말고 이어서 들어오는 입력만 통역하십시오)]\n${recentContext}`;
-      }
-      return prompt;
-    }
-
-    function sendRuleUpdateSignal() {
-      if (!ws || ws.readyState !== WebSocket.OPEN) return;
-      ws.send(JSON.stringify({
-        clientContent: {
-          turns: [{
-            role: "user",
-            parts: [{
-              text: `${getDynamicRuleText()}\n(이 지시문에는 대답하지 말고 다음 입력부터 즉시 음성으로 통역만 출력하십시오.)`
-            }]
-          }],
-          turnComplete: true
-        }
-      }));
     }
 
     async function requestWakeLock() {
@@ -1938,10 +1749,9 @@
 
       saveSettings();
       settingsPanel.classList.add("hidden");
-      setStatus("연결 중...", "normal");
+      setStatus("이중 연결 중...", "normal");
       mainActionBtn.disabled = true;
       isConnecting = true;
-      reconnectAttemptCount = 0;
 
       try {
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
@@ -1959,7 +1769,7 @@
           hasAudioInputSource = false;
           audioSourceMode = "none";
         }
-      } catch (micErr) {
+      } catch (err) {
         micStream = null;
         hasAudioInputSource = false;
         audioSourceMode = "none";
@@ -1969,21 +1779,11 @@
     }
 
     async function startSessionWithExistingStream() {
-      const apiKey = getActiveApiKey();
-      const tierLabel = activeKeyTier === "paid" ? "유료 키" : "무료 키";
-
-      if (!apiKey) {
-        alert(`선택된 [${tierLabel}]가 비어 있습니다. 설정창에서 API 키를 먼저 등록해 주세요.`);
-        settingsPanel.classList.remove("hidden");
-        return;
-      }
-
       saveSettings();
       settingsPanel.classList.add("hidden");
-      setStatus("연결 중...", "normal");
+      setStatus("이중 연결 중...", "normal");
       mainActionBtn.disabled = true;
       isConnecting = true;
-      reconnectAttemptCount = 0;
 
       if (outputAudioCtx && outputAudioCtx.state === "suspended") {
         await outputAudioCtx.resume();
@@ -1993,67 +1793,40 @@
         startMicCapture();
       }
       requestWakeLock();
-      connectWebSocket(false, "", "");
+      connectDualWebSockets(false, "");
     }
 
-    function connectWebSocket(isRenewal, recentContext, renewalReason) {
+    // 채널 1(원문 연속 전사)과 채널 2(병렬 음성 합성) 동시 개설
+    function connectDualWebSockets(isRenewal, renewalReason) {
       const apiKey = getActiveApiKey();
       const tierLabel = activeKeyTier === "paid" ? "유료 키" : "무료 키";
       const modelName = modelInput.value.trim() || "gemini-2.5-flash-native-audio-preview-12-2025";
+      const voiceName = voiceNameSelect.value || "Aoede";
       const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${encodeURIComponent(apiKey)}`;
 
-      const socket = new WebSocket(wsUrl);
-      ws = socket;
+      // 1. 채널 1 WebSocket: 듣기 및 원문 전사 전용 (음성 출력 무음 처리하여 청취만 전담)
+      const listenerSock = new WebSocket(wsUrl);
+      wsListener = listenerSock;
 
-      socket.onopen = () => {
-        if (ws !== socket) return;
-        const useVoice = voiceOutputSelect.value === "on";
-        const voiceName = voiceNameSelect.value || "Aoede";
-        const silenceMs = parseInt(vadSpeedSelect.value, 10) || 250;
-
-        const generationConfig = {
-          responseModalities: useVoice ? ["AUDIO"] : ["TEXT"]
+      listenerSock.onopen = () => {
+        if (wsListener !== listenerSock) return;
+        const listenerSetup = {
+          setup: {
+            model: `models/${modelName}`,
+            generationConfig: {
+              responseModalities: ["AUDIO"]
+            },
+            systemInstruction: {
+              parts: [{
+                text: "You are a silent passive audio transcriber. Never speak, never reply, and never generate audio. Just listen silently to incoming speech."
+              }]
+            },
+            inputAudioTranscription: {}
+          }
         };
-        if (useVoice) {
-          generationConfig.speechConfig = {
-            voiceConfig: {
-              prebuiltVoiceConfig: {
-                voiceName: voiceName
-              }
-            }
-          };
-        }
-
-        const setupObj = {
-          model: `models/${modelName}`,
-          generationConfig: generationConfig,
-          systemInstruction: {
-            parts: [{ text: buildSystemInstruction(recentContext) }]
-          },
-          inputAudioTranscription: {}
-        };
-        if (useVoice) {
-          setupObj.outputAudioTranscription = {};
-        }
-
-        // 구형 2.0-flash-exp가 아닌 최신 네이티브 오디오 모델일 때 초저지연 VAD 설정 주입
-        const isLegacy20 = modelName.includes("2.0-flash-exp");
-        if (!disableAdvancedVad && !isLegacy20) {
-          setupObj.realtimeInputConfig = {
-            automaticActivityDetection: {
-              disabled: false,
-              startOfSpeechSensitivity: "START_SENSITIVITY_HIGH",
-              endOfSpeechSensitivity: "END_SENSITIVITY_HIGH",
-              prefixPaddingMs: 100,
-              silenceDurationMs: silenceMs
-            }
-          };
-        }
-
-        socket.send(JSON.stringify({ setup: setupObj }));
+        listenerSock.send(JSON.stringify(listenerSetup));
 
         sessionElapsedSec = 0;
-        reconnectAttemptCount = 0;
         isConnecting = false;
         isRenewing = false;
         isRunning = true;
@@ -2061,139 +1834,400 @@
         mainActionBtn.disabled = false;
         mainActionBtn.textContent = "통역 중지";
         mainActionBtn.className = "btn-main btn-stop";
-        setMicGateVisual(false);
-        setStatus("실시간 통역 중", "connected");
+        ch1StateText.textContent = "연속 청취 중";
+        updateAudioGateIndicator();
+        setStatus("이중 파이프라인 가동", "connected");
+        startSlidingChunkLoop();
 
         if (!isRenewal) {
           startSessionTimer();
+          liveOriginalStream.textContent = "";
+          liveTranslatedStream.textContent = "";
           const partnerKoName = LANG_NAMES[partnerLangSelect.value].ko;
-          if (!hasAudioInputSource) {
-            addSystemMessage(`[${tierLabel} / 무마이크 모드] 연결 완료. PC에 마이크가 없어 텍스트 전송 및 탭 소리 입력 모드로 대기합니다.`);
-          } else {
-            addSystemMessage(`[${tierLabel} / 초저지연 엔진] 연결 완료. 한국어 또는 ${partnerKoName}로 말씀하시면 즉시 연속 음성 통역됩니다.`);
-          }
+          addSystemMessage(`[${tierLabel}] 이중 파이프라인 가동 시작. 원문은 멈춤 없이 실시간 기록되고, ${partnerKoName}·한국어 동시통역 음성이 2초 단위로 병렬 송출됩니다.`);
         } else {
-          addSystemMessage(`세션 무중단 갱신 완료 (${renewalReason} · 직전 대화 맥락 유지됨)`);
+          addSystemMessage(`이중 파이프라인 무중단 갱신 완료 (${renewalReason})`);
         }
       };
 
-      socket.onmessage = async (event) => {
-        if (ws !== socket) return;
+      listenerSock.onmessage = async (event) => {
+        if (wsListener !== listenerSock) return;
         let rawText = event.data;
-        if (rawText instanceof Blob) {
-          rawText = await rawText.text();
-        }
+        if (rawText instanceof Blob) rawText = await rawText.text();
         const data = JSON.parse(rawText);
 
-        if (data.goAway) {
-          if (!isRenewing) {
-            if (!isAiTurnActive && !isAiSpeaking && ringAvailableSamples === 0) {
-              triggerSeamlessRenewal("서버 사전 예고 자동 갱신");
-            } else {
-              renewalPending = true;
+        if (data.error) {
+          addErrorDiagnosticMessage(data.error.code || "CH1_ERR", data.error.message || "");
+          return;
+        }
+
+        const sc = data.serverContent;
+        if (sc && sc.inputTranscription && sc.inputTranscription.text) {
+          const piece = sc.inputTranscription.text;
+          // 전사가 정상 도착하면 백업 PCM 버퍼는 비움
+          pcmBackupSamples = [];
+          pcmBackupActiveVoiceSamples = 0;
+
+          pendingTranscriptBuffer += piece;
+          lastTranscriptReceivedAt = Date.now();
+
+          liveOriginalStream.textContent += piece;
+          liveOriginalStream.scrollTop = liveOriginalStream.scrollHeight;
+
+          // 1.2초 이상 경과 후 구두점(마침표, 쉼표, 물음표)이 포착되면 2초를 채우지 않고 즉시 조기 발사
+          const minEarlyMs = Math.max(1000, parseInt(chunkIntervalSelect.value, 10) - 600);
+          if (/[.,?!。、？！]\s*$/.test(pendingTranscriptBuffer) && pendingTranscriptBuffer.trim().length >= 6) {
+            flushPendingTranscriptChunk();
+          }
+        }
+      };
+
+      listenerSock.onclose = (e) => {
+        if (wsListener !== listenerSock || isRenewing) return;
+        if (isRunning || isConnecting) {
+          if (e.code !== 1000 && e.code !== 1005) {
+            setStatus(`오류 (${e.code})`, "error");
+            addErrorDiagnosticMessage(e.code, e.reason);
+          }
+          cleanupResources();
+        }
+      };
+
+      // 2. 채널 2 WebSocket: 2초 단위 직독직해 결과물을 고음질 원어민 음성으로 즉시 합성하는 전용 출력기
+      const speakerSock = new WebSocket(wsUrl);
+      wsSpeaker = speakerSock;
+
+      speakerSock.onopen = () => {
+        if (wsSpeaker !== speakerSock) return;
+        const speakerSetup = {
+          setup: {
+            model: `models/${modelName}`,
+            generationConfig: {
+              responseModalities: ["AUDIO"],
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: {
+                    voiceName: voiceName
+                  }
+                }
+              }
+            },
+            systemInstruction: {
+              parts: [{
+                text: "You are a dedicated simultaneous interpretation voice synthesizer. Read aloud the exact user text sent to you immediately, clearly, and at a natural brisk interpreter pace. Never add greetings, explanations, or extra words. Output ONLY the spoken audio of the exact text given."
+              }]
             }
           }
-          return;
-        }
-
-        if (data.error) {
-          addErrorDiagnosticMessage(data.error.code || "API_ERROR", data.error.message || JSON.stringify(data.error));
-          return;
-        }
-        handleServerMessage(data);
+        };
+        speakerSock.send(JSON.stringify(speakerSetup));
+        ch2StateText.textContent = "음성엔진 대기";
       };
 
-      socket.onerror = () => {
-        if (ws !== socket) return;
-        setStatus("연결 오류", "error");
+      speakerSock.onmessage = async (event) => {
+        if (wsSpeaker !== speakerSock) return;
+        let rawText = event.data;
+        if (rawText instanceof Blob) rawText = await rawText.text();
+        const data = JSON.parse(rawText);
+
+        const sc = data.serverContent;
+        if (!sc) return;
+
+        if (sc.modelTurn && sc.modelTurn.parts) {
+          for (const part of sc.modelTurn.parts) {
+            if (part.inlineData && part.inlineData.mimeType && part.inlineData.mimeType.startsWith("audio/pcm")) {
+              if (voiceOutputSelect.value === "on") {
+                pushPcm24kToRingBuffer(part.inlineData.data);
+              }
+            }
+          }
+        }
+
+        if (sc.turnComplete) {
+          isSpeakerBusy = false;
+          pumpSpeakerQueue();
+        }
       };
 
-      socket.onclose = (e) => {
-        if (ws !== socket) return;
-        if (isRenewing) return;
-
-        const wasActive = isRunning || isConnecting;
-        if (!wasActive) return;
-
-        // 일부 모델이 realtimeInputConfig 필드를 거절해 1008 오류가 날 경우 호환 모드로 1회 즉시 자동 재접속
-        if (e.code === 1008 && !disableAdvancedVad && (e.reason || "").toLowerCase().includes("realtimeinputconfig")) {
-          disableAdvancedVad = true;
-          addSystemMessage("선택한 모델의 호환 모드에 맞춰 고속 VAD 옵션을 자동 조정한 뒤 즉시 재연결합니다...");
-          isRenewing = true;
-          setTimeout(() => connectWebSocket(isRenewal, recentContext, "호환 모드 자동 전환"), 150);
-          return;
-        }
-
-        const isFatalPolicyError = e.code === 1008;
-        if (isRunning && !isFatalPolicyError && e.code !== 1000 && reconnectAttemptCount < 3) {
-          reconnectAttemptCount += 1;
-          addSystemMessage(`일시적 연결 끊김(코드 ${e.code}) 감지: 자동 재연결 시도 중 (${reconnectAttemptCount}/3)...`);
-          triggerSeamlessRenewal(`자동 복구 ${reconnectAttemptCount}회차`);
-          return;
-        }
-
-        if (e.code !== 1000 && e.code !== 1005) {
-          setStatus(`오류 (${e.code})`, "error");
-          addErrorDiagnosticMessage(e.code, e.reason);
-        } else {
-          addSystemMessage(`통역 세션이 종료되었습니다. (코드: ${e.code})`);
-        }
-        cleanupResources();
+      speakerSock.onclose = () => {
+        if (wsSpeaker !== speakerSock || isRenewing) return;
+        isSpeakerBusy = false;
       };
     }
 
-    function handleServerMessage(data) {
-      const serverContent = data.serverContent;
-      if (!serverContent) return;
+    // 2초 슬라이딩 청크 루프 시작
+    function startSlidingChunkLoop() {
+      stopSlidingChunkLoop();
+      const intervalMs = parseInt(chunkIntervalSelect.value, 10) || 2000;
 
-      if (serverContent.interrupted) {
-        if (echoGuardSelect.value === "speaker" && (isAiTurnActive || isAiSpeaking)) {
-          return;
-        }
-        stopAllPlayingAudio();
-        currentTranslatedBubble = null;
-        return;
+      slidingChunkTimer = setInterval(() => {
+        if (!isRunning) return;
+        flushPendingTranscriptChunk();
+      }, intervalMs);
+    }
+
+    function stopSlidingChunkLoop() {
+      if (slidingChunkTimer) {
+        clearInterval(slidingChunkTimer);
+        slidingChunkTimer = null;
+      }
+    }
+
+    function flushPendingTranscriptChunk() {
+      const textToTranslate = pendingTranscriptBuffer.trim();
+      if (!textToTranslate) return;
+
+      pendingTranscriptBuffer = "";
+      const seqId = ++chunkSequenceCounter;
+      dispatchParallelTextChunk(seqId, textToTranslate);
+    }
+
+    // 비동기 병렬 직독직해 번역기 (시퀀스 번호 1, 2, 3... 순서 보장 출력)
+    async function dispatchParallelTextChunk(seqId, originalChunkText) {
+      const apiKey = getActiveApiKey();
+      if (!apiKey) return;
+
+      ch2StateText.textContent = `구절 #${seqId} 동시번역 중`;
+
+      const partnerCode = partnerLangSelect.value;
+      const partnerInfo = LANG_NAMES[partnerCode];
+      const mode = autoModeSelect.value;
+      const tone = toneSelect.value;
+      const glossary = glossaryInput.value.trim();
+
+      let toneDesc = "자연스럽고 정중한 존댓말(해요체 또는 공손한 회화체)";
+      if (tone === "casual") toneDesc = "자연스럽고 친근한 일상 구어체";
+      if (tone === "formal") toneDesc = "비즈니스 협상 및 학술 세미나에 적합한 격식체";
+
+      let dirRule = `입력 구절이 한국어이면 ${toneDesc}의 ${partnerInfo.ko}(${partnerInfo.en})로, 외국어(영어·중국어·일본어·스페인어)이면 ${toneDesc}의 한국어로 즉시 직독직해하십시오.`;
+      if (mode === "to_ko_only") {
+        dirRule = `입력 구절을 ${toneDesc}의 자연스러운 한국어로만 즉시 직독직해하십시오.`;
+      } else if (mode === "from_ko_only") {
+        dirRule = `입력 구절을 ${toneDesc}의 자연스러운 ${partnerInfo.ko}(${partnerInfo.en})로만 즉시 직독직해하십시오.`;
       }
 
-      if (serverContent.inputTranscription && serverContent.inputTranscription.text) {
-        appendUserTranscript(serverContent.inputTranscription.text);
-      }
+      const prevContext = recentTranslatedHistory.slice(-2).join(" ");
+      const promptText = [
+        "당신은 유엔(UN) 회의 수준의 초저지연 동시통역사입니다.",
+        dirRule,
+        "동시통역 핵심 규칙:",
+        "1. 문장이 미완성된 짧은 구절이더라도 끝까지 기다리지 말고, 앞선 문맥과 자연스럽게 이어지도록 어순을 맞추어 현재 구절의 의미만 즉시 통역하십시오.",
+        "2. [직전 통역 맥락]의 내용을 절대 반복해서 출력하지 말고, 오직 [현재 통역할 구절]에 해당하는 번역 결과만 출력하십시오.",
+        "3. 부연 설명, 괄호, 인사말, 따옴표를 일절 쓰지 말고 오직 입으로 바로 읽을 통역 문장만 출력하십시오.",
+        glossary ? `[전문 용어집]\n${glossary}` : "",
+        prevContext ? `[직전 통역 맥락 (중복 출력 금지)]\n${prevContext}` : "",
+        `[현재 통역할 구절]\n${originalChunkText}`
+      ].filter(Boolean).join("\n\n");
 
-      if (serverContent.outputTranscription && serverContent.outputTranscription.text) {
-        currentUserBubble = null;
-        appendTranslatedText(serverContent.outputTranscription.text);
-      }
-
-      if (serverContent.modelTurn && serverContent.modelTurn.parts) {
-        currentUserBubble = null;
-        isAiTurnActive = true;
-        for (const part of serverContent.modelTurn.parts) {
-          if (part.text) {
-            appendTranslatedText(part.text);
-          }
-          if (part.inlineData && part.inlineData.mimeType && part.inlineData.mimeType.startsWith("audio/pcm")) {
-            if (voiceOutputSelect.value === "on") {
-              pushPcm24kToRingBuffer(part.inlineData.data);
+      try {
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ role: "user", parts: [{ text: promptText }] }],
+            generationConfig: {
+              temperature: 0.1,
+              thinkingConfig: { thinkingBudget: 0 }
             }
+          })
+        });
+
+        const result = await response.json();
+        const translatedText = result.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+
+        completedChunkResults.set(seqId, {
+          orig: originalChunkText,
+          trans: translatedText
+        });
+      } catch (err) {
+        completedChunkResults.set(seqId, {
+          orig: originalChunkText,
+          trans: ""
+        });
+      }
+
+      commitOrderedChunks();
+    }
+
+    // 병렬로 도착한 번역 구절을 1, 2, 3 순서대로 정렬해 화면 기록 및 음성 합성 큐에 투입
+    function commitOrderedChunks() {
+      while (completedChunkResults.has(nextExpectedPlaySeq)) {
+        const seq = nextExpectedPlaySeq;
+        const item = completedChunkResults.get(seq);
+        completedChunkResults.delete(seq);
+        nextExpectedPlaySeq += 1;
+
+        if (item.trans) {
+          recentTranslatedHistory.push(item.trans);
+          if (recentTranslatedHistory.length > 6) {
+            recentTranslatedHistory.shift();
+          }
+
+          liveTranslatedStream.textContent += (liveTranslatedStream.textContent ? " " : "") + item.trans;
+          liveTranslatedStream.scrollTop = liveTranslatedStream.scrollHeight;
+
+          appendChunkPairCard(seq, item.orig, item.trans);
+
+          if (voiceOutputSelect.value === "on") {
+            enqueueSpeakerText(item.trans);
           }
         }
       }
+    }
 
-      if (serverContent.turnComplete) {
-        isAiTurnActive = false;
-        currentTranslatedBubble = null;
-        currentUserBubble = null;
-        if (ringAvailableSamples === 0) {
-          scheduleMicReopenAfterPlayback();
-        }
+    function appendChunkPairCard(seq, origText, transText) {
+      const card = document.createElement("div");
+      card.className = "bubble chunk-pair";
+      card.innerHTML = `
+        <div class="bubble-header">
+          <span class="bubble-label">구절 #${seq} 동시통역</span>
+          <span class="bubble-time">${getFormattedTime()}</span>
+        </div>
+        <div class="chunk-orig-line"></div>
+        <div class="chunk-trans-line"></div>
+      `;
+      card.querySelector(".chunk-orig-line").textContent = origText;
+      card.querySelector(".chunk-trans-line").textContent = transText;
+      transcriptBox.appendChild(card);
+      transcriptBox.scrollTop = transcriptBox.scrollHeight;
+    }
+
+    function enqueueSpeakerText(text) {
+      speakerSpeechQueue.push(text);
+      pumpSpeakerQueue();
+    }
+
+    function pumpSpeakerQueue() {
+      if (isSpeakerBusy || speakerSpeechQueue.length === 0) return;
+      const nextText = speakerSpeechQueue.shift();
+
+      if (wsSpeaker && wsSpeaker.readyState === WebSocket.OPEN) {
+        isSpeakerBusy = true;
+        wsSpeaker.send(JSON.stringify({
+          clientContent: {
+            turns: [{
+              role: "user",
+              parts: [{ text: nextText }]
+            }],
+            turnComplete: true
+          }
+        }));
+      } else {
+        // 웹소켓 스피커가 일시 재연결 중일 경우 브라우저 내장 음성 합성으로 무중단 백업 출력
+        speakWithBrowserTtsFallback(nextText);
       }
+    }
+
+    function speakWithBrowserTtsFallback(text) {
+      if (!("speechSynthesis" in window)) return;
+      const utter = new SpeechSynthesisUtterance(text);
+      const isKorean = /[가-힣]/.test(text);
+      if (isKorean) {
+        utter.lang = "ko-KR";
+      } else {
+        const map = { en: "en-US", zh: "zh-CN", ja: "ja-JP", es: "es-ES" };
+        utter.lang = map[partnerLangSelect.value] || "en-US";
+      }
+      utter.rate = 1.12;
+      window.speechSynthesis.speak(utter);
+    }
+
+    // 2.2초 직접 오디오 백업 파이프라인 (전사 지연 시 원음 WAV 슬라이스를 직접 멀티모달로 병렬 통역)
+    async function dispatchDirectAudioBackup(float32Samples16k) {
+      if (isBackupPcmInFlight) return;
+      const apiKey = getActiveApiKey();
+      if (!apiKey) return;
+
+      isBackupPcmInFlight = true;
+      const seqId = ++chunkSequenceCounter;
+      const wavBase64 = encodeFloat32ToWavBase64(float32Samples16k, 16000);
+
+      const partnerCode = partnerLangSelect.value;
+      const partnerInfo = LANG_NAMES[partnerCode];
+      const mode = autoModeSelect.value;
+      const tone = toneSelect.value;
+
+      let dirDesc = `한국어 음성이면 ${partnerInfo.ko}(${partnerInfo.en})로, 외국어 음성이면 한국어로`;
+      if (mode === "to_ko_only") dirDesc = "외국어 음성을 한국어로";
+      if (mode === "from_ko_only") dirDesc = `한국어 음성을 ${partnerInfo.ko}(${partnerInfo.en})로`;
+
+      const prompt = `들리는 음성의 원문을 그대로 받아적고(orig), ${dirDesc} ${tone === "formal" ? "격식체" : "자연스러운 존댓말"} 직독직해 동시통역(trans)을 수행해 반드시 JSON 형식 {"orig":"원문","trans":"통역문"} 으로만 출력하십시오.`;
+
+      try {
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{
+              role: "user",
+              parts: [
+                { text: prompt },
+                { inlineData: { mimeType: "audio/wav", data: wavBase64 } }
+              ]
+            }],
+            generationConfig: {
+              temperature: 0.1,
+              responseMimeType: "application/json",
+              thinkingConfig: { thinkingBudget: 0 }
+            }
+          })
+        });
+
+        const result = await response.json();
+        const rawJsonText = result.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+        const parsed = JSON.parse(rawJsonText);
+
+        if (parsed.orig) {
+          liveOriginalStream.textContent += (liveOriginalStream.textContent ? " " : "") + parsed.orig;
+          liveOriginalStream.scrollTop = liveOriginalStream.scrollHeight;
+        }
+
+        completedChunkResults.set(seqId, {
+          orig: parsed.orig || "(음성 구절)",
+          trans: parsed.trans || ""
+        });
+      } catch (e) {
+        completedChunkResults.set(seqId, { orig: "", trans: "" });
+      } finally {
+        isBackupPcmInFlight = false;
+        commitOrderedChunks();
+      }
+    }
+
+    function encodeFloat32ToWavBase64(samples, sampleRate) {
+      const buffer = new ArrayBuffer(44 + samples.length * 2);
+      const view = new DataView(buffer);
+
+      const writeStr = (offset, str) => {
+        for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+      };
+
+      writeStr(0, "RIFF");
+      view.setUint32(4, 36 + samples.length * 2, true);
+      writeStr(8, "WAVE");
+      writeStr(12, "fmt ");
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true);
+      view.setUint16(22, 1, true);
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, sampleRate * 2, true);
+      view.setUint16(32, 2, true);
+      view.setUint16(34, 16, true);
+      writeStr(36, "data");
+      view.setUint32(40, samples.length * 2, true);
+
+      let offset = 44;
+      for (let i = 0; i < samples.length; i++, offset += 2) {
+        const s = Math.max(-1, Math.min(1, samples[i]));
+        view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+      }
+      return arrayBufferToBase64(buffer);
     }
 
     function downsampleTo16k(float32Buffer, inputRate) {
       const targetRate = 16000;
-      if (inputRate === targetRate) {
-        return float32Buffer;
-      }
+      if (inputRate === targetRate) return float32Buffer;
       const ratio = inputRate / targetRate;
       const newLength = Math.round(float32Buffer.length / ratio);
       const result = new Float32Array(newLength);
@@ -2224,19 +2258,13 @@
       }
       const nativeSampleRate = inputAudioCtx.sampleRate || 48000;
       const source = inputAudioCtx.createMediaStreamSource(micStream);
-      // 1024 샘플 초저지연 버퍼로 전송 지연 4배 단축
       processorNode = inputAudioCtx.createScriptProcessor(1024, 1, 1);
 
       muteGainNode = inputAudioCtx.createGain();
       muteGainNode.gain.value = 0;
 
       processorNode.onaudioprocess = (e) => {
-        if (!isRunning || isRenewing || !hasAudioInputSource || !ws || ws.readyState !== WebSocket.OPEN) return;
-
-        const blockEcho = echoGuardSelect.value === "speaker" && (isAiTurnActive || isAiSpeaking);
-        if (blockEcho) {
-          return;
-        }
+        if (!isRunning || !hasAudioInputSource) return;
 
         const rawFloat32 = e.inputBuffer.getChannelData(0);
         const downsampled16k = downsampleTo16k(rawFloat32, nativeSampleRate);
@@ -2249,21 +2277,46 @@
         const level = Math.min(100, Math.round(rms * 450));
         volumeFill.style.width = level + "%";
 
+        // 스피커 감쇠 모드일 때만 송출 중 입력 게인을 낮추고, 동시 송수신 모드에서는 100% 원음 그대로 전달
+        const duckFactor = (isAiSpeaking && duplexModeSelect.value === "speaker_duck") ? 0.25 : 1.0;
+
         const int16Buffer = new Int16Array(downsampled16k.length);
         for (let i = 0; i < downsampled16k.length; i++) {
-          const s = Math.max(-1, Math.min(1, downsampled16k[i]));
+          const s = Math.max(-1, Math.min(1, downsampled16k[i] * duckFactor));
           int16Buffer[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
         }
-        const base64Audio = arrayBufferToBase64(int16Buffer.buffer);
 
-        ws.send(JSON.stringify({
-          realtimeInput: {
-            mediaChunks: [{
-              mimeType: "audio/pcm;rate=16000",
-              data: base64Audio
-            }]
+        // 채널 1 웹소켓으로 실시간 연속 스트리밍
+        if (!isRenewing && wsListener && wsListener.readyState === WebSocket.OPEN) {
+          const base64Audio = arrayBufferToBase64(int16Buffer.buffer);
+          wsListener.send(JSON.stringify({
+            realtimeInput: {
+              mediaChunks: [{
+                mimeType: "audio/pcm;rate=16000",
+                data: base64Audio
+              }]
+            }
+          }));
+        }
+
+        // 백업 PCM 슬라이딩 버퍼 적재 (전사 지연 대비용)
+        if (rms > 0.012 && duckFactor === 1.0) {
+          for (let i = 0; i < downsampled16k.length; i++) {
+            pcmBackupSamples.push(downsampled16k[i]);
           }
-        }));
+          pcmBackupActiveVoiceSamples += downsampled16k.length;
+
+          // 활성 발화가 2.2초(35200샘플) 쌓였는데 채널 1 전사가 아직 도착하지 않았으면 즉시 백업 파이프라인 발사
+          if (pcmBackupActiveVoiceSamples >= 35200 && (Date.now() - lastTranscriptReceivedAt > 2100)) {
+            const sliceToSend = new Float32Array(pcmBackupSamples);
+            pcmBackupSamples = [];
+            pcmBackupActiveVoiceSamples = 0;
+            dispatchDirectAudioBackup(sliceToSend);
+          }
+        } else if (pcmBackupSamples.length > 48000) {
+          pcmBackupSamples = [];
+          pcmBackupActiveVoiceSamples = 0;
+        }
       };
 
       source.connect(processorNode);
@@ -2290,55 +2343,27 @@
       }
     }
 
-    function scheduleMicReopenAfterPlayback() {
-      if (isAiTurnActive || ringAvailableSamples > 0) {
-        return;
-      }
-      if (echoGuardTimer) {
-        clearTimeout(echoGuardTimer);
-      }
-      const tailMs = parseInt(tailGuardSelect.value, 10) || 300;
-      echoGuardTimer = setTimeout(() => {
-        if (isAiTurnActive || ringAvailableSamples > 0) return;
-        isAiSpeaking = false;
-        echoGuardTimer = null;
-        if (isRunning) {
-          setMicGateVisual(false);
-          setStatus("실시간 통역 중", "connected");
-          if (renewalPending) {
-            triggerSeamlessRenewal("12분 주기 자동 갱신");
-          }
-        }
-      }, tailMs);
-    }
-
-    function stopAllPlayingAudio() {
-      if (echoGuardTimer) {
-        clearTimeout(echoGuardTimer);
-        echoGuardTimer = null;
-      }
-      clearRingBuffer();
-      isAiTurnActive = false;
-      isAiSpeaking = false;
-      if (isRunning) {
-        setMicGateVisual(false);
-        setStatus("실시간 통역 중", "connected");
-      }
-    }
-
     function cleanupResources() {
       isRunning = false;
       isConnecting = false;
       isRenewing = false;
-      renewalPending = false;
-      isAiTurnActive = false;
-      hasAudioInputSource = false;
-      audioSourceMode = "none";
+      stopSlidingChunkLoop();
       stopSessionTimer();
       releaseWakeLock();
-      stopAllPlayingAudio();
+      clearRingBuffer();
       stopCurrentAudioCaptureOnly(true);
-      setMicGateVisual(false);
+
+      hasAudioInputSource = false;
+      audioSourceMode = "none";
+      speakerSpeechQueue = [];
+      isSpeakerBusy = false;
+      pendingTranscriptBuffer = "";
+      pcmBackupSamples = [];
+      pcmBackupActiveVoiceSamples = 0;
+
+      ch1StateText.textContent = "대기";
+      ch2StateText.textContent = "대기";
+      updateAudioGateIndicator();
 
       mainActionBtn.disabled = false;
       mainActionBtn.textContent = "통역 시작";
@@ -2346,13 +2371,17 @@
     }
 
     function stopSession() {
-      const oldWs = ws;
-      ws = null;
+      const oldListener = wsListener;
+      const oldSpeaker = wsSpeaker;
+      wsListener = null;
+      wsSpeaker = null;
       cleanupResources();
-      if (oldWs) {
-        if (oldWs.readyState === WebSocket.OPEN || oldWs.readyState === WebSocket.CONNECTING) {
-          oldWs.close(1000, "User stopped");
-        }
+
+      if (oldListener) {
+        try { oldListener.close(1000, "User stopped"); } catch (e) {}
+      }
+      if (oldSpeaker) {
+        try { oldSpeaker.close(1000, "User stopped"); } catch (e) {}
       }
       setStatus("대기 중", "normal");
     }
