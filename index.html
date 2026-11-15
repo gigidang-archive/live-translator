@@ -1,0 +1,1403 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230284c7'/%3E%3Ctext x='50' y='66' font-size='52' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'%3E譯%3C/text%3E%3C/svg%3E" />
+  <title>AI 양방향 4개국어 실시간 동시통역기</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Malgun Gothic", "맑은 고딕", sans-serif;
+    }
+    body {
+      background-color: #0f172a;
+      color: #f8fafc;
+      display: flex;
+      flex-direction: column;
+      height: 100dvh;
+      overflow: hidden;
+    }
+    header {
+      background-color: #1e293b;
+      padding: 11px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #334155;
+    }
+    header h1 {
+      font-size: 16px;
+      font-weight: 700;
+      color: #38bdf8;
+    }
+    .header-sub {
+      font-size: 11px;
+      color: #94a3b8;
+      margin-top: 2px;
+    }
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .tier-badge {
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-weight: 700;
+      background-color: #1e3a8a;
+      color: #93c5fd;
+      border: 1px solid #2563eb;
+      cursor: pointer;
+    }
+    .tier-badge.paid {
+      background-color: #78350f;
+      color: #fcd34d;
+      border-color: #d97706;
+    }
+    .status-badge {
+      font-size: 12px;
+      padding: 4px 9px;
+      border-radius: 999px;
+      background-color: #334155;
+      color: #cbd5e1;
+      font-weight: 600;
+    }
+    .status-badge.connected {
+      background-color: #065f46;
+      color: #6ee7b7;
+    }
+    .status-badge.error {
+      background-color: #7f1d1d;
+      color: #fca5a5;
+    }
+    .settings-toggle {
+      background: #334155;
+      color: #f8fafc;
+      border: none;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .quick-lang-bar {
+      background-color: #1e293b;
+      padding: 8px 12px;
+      border-bottom: 1px solid #334155;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+    }
+    .quick-lang-btn {
+      background-color: #0f172a;
+      color: #94a3b8;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 7px 4px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      text-align: center;
+    }
+    .quick-lang-btn.active {
+      background-color: #0284c7;
+      color: #ffffff;
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.4);
+    }
+    .log-toolbar {
+      background-color: #162032;
+      padding: 6px 16px;
+      border-bottom: 1px solid #334155;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+    .log-toolbar-title {
+      font-size: 12px;
+      color: #94a3b8;
+    }
+    .log-toolbar-actions {
+      display: flex;
+      gap: 6px;
+    }
+    .btn-tool {
+      background-color: #334155;
+      color: #e2e8f0;
+      border: 1px solid #475569;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.15s;
+    }
+    .btn-tool:active {
+      background-color: #475569;
+    }
+    .btn-tool.success {
+      background-color: #065f46;
+      border-color: #10b981;
+      color: #6ee7b7;
+    }
+    .settings-panel {
+      background-color: #1e293b;
+      padding: 12px 16px;
+      border-bottom: 1px solid #334155;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-height: 64dvh;
+      overflow-y: auto;
+    }
+    .settings-panel.hidden {
+      display: none;
+    }
+    .tier-selector-box {
+      background-color: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .tier-switch-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .tier-choice-btn {
+      padding: 9px 8px;
+      border-radius: 6px;
+      border: 1px solid #475569;
+      background-color: #1e293b;
+      color: #94a3b8;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s;
+    }
+    .tier-choice-btn.active-free {
+      background-color: #1d4ed8;
+      border-color: #60a5fa;
+      color: #ffffff;
+    }
+    .tier-choice-btn.active-paid {
+      background-color: #b45309;
+      border-color: #fbbf24;
+      color: #ffffff;
+    }
+    .field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .field-group label {
+      font-size: 12px;
+      color: #94a3b8;
+    }
+    .field-group input, .field-group select, .field-group textarea {
+      background-color: #0f172a;
+      border: 1px solid #475569;
+      color: #f8fafc;
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+    .field-group textarea {
+      resize: vertical;
+      min-height: 48px;
+    }
+    .api-key-row {
+      display: flex;
+      gap: 5px;
+      align-items: stretch;
+    }
+    .api-key-row input[type="password"],
+    .api-key-row input[type="text"] {
+      flex: 1;
+      min-width: 0;
+      font-size: 13px;
+    }
+    .btn-file-load {
+      background-color: #0369a1;
+      color: #ffffff;
+      border: 1px solid #0284c7;
+      padding: 0 9px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .btn-key-toggle {
+      background-color: #334155;
+      color: #cbd5e1;
+      border: 1px solid #475569;
+      padding: 0 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .key-status-msg {
+      font-size: 11px;
+      color: #34d399;
+      min-height: 15px;
+    }
+    .row-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .transcript-container {
+      flex: 1;
+      padding: 14px 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .bubble {
+      padding: 12px 14px;
+      border-radius: 12px;
+      line-height: 1.55;
+      font-size: 16px;
+      word-break: keep-all;
+      animation: fadeIn 0.2s ease;
+    }
+    .bubble.system {
+      background-color: #1e293b;
+      color: #94a3b8;
+      font-size: 13px;
+      text-align: center;
+    }
+    .bubble.user-speech {
+      background-color: #1e293b;
+      border-left: 3px solid #64748b;
+      color: #cbd5e1;
+      font-size: 14px;
+    }
+    .bubble.translated-ko {
+      background-color: #172554;
+      border-left: 4px solid #38bdf8;
+      color: #ffffff;
+      font-size: 18px;
+      font-weight: 500;
+    }
+    .bubble.translated-foreign {
+      background-color: #064e3b;
+      border-left: 4px solid #34d399;
+      color: #ffffff;
+      font-size: 18px;
+      font-weight: 500;
+    }
+    .bubble-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+    .bubble-label {
+      font-size: 11px;
+      color: #7dd3fc;
+      font-weight: 600;
+    }
+    .bubble.translated-foreign .bubble-label {
+      color: #6ee7b7;
+    }
+    .bubble-time {
+      font-size: 10px;
+      color: #64748b;
+    }
+    .controls {
+      background-color: #1e293b;
+      padding: 10px 16px 18px 16px;
+      border-top: 1px solid #334155;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+    .visualizer-bar {
+      width: 100%;
+      height: 5px;
+      background-color: #0f172a;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .visualizer-fill {
+      height: 100%;
+      width: 0%;
+      background-color: #38bdf8;
+      transition: width 0.08s linear;
+    }
+    .direction-btn {
+      width: 100%;
+      padding: 13px 14px;
+      border-radius: 12px;
+      border: 2px solid #0284c7;
+      background-color: #0f172a;
+      color: #e0f2fe;
+      font-size: 15px;
+      font-weight: 700;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .direction-btn.to-foreign {
+      border-color: #10b981;
+      background-color: #022c22;
+      color: #d1fae5;
+    }
+    .direction-badge {
+      font-size: 12px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      background-color: #0284c7;
+      color: #ffffff;
+    }
+    .direction-btn.to-foreign .direction-badge {
+      background-color: #059669;
+    }
+    .btn-row {
+      display: flex;
+      gap: 10px;
+    }
+    .btn-main {
+      flex: 1;
+      padding: 14px;
+      border: none;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background-color 0.15s;
+    }
+    .btn-start {
+      background-color: #0284c7;
+      color: #ffffff;
+    }
+    .btn-start:active {
+      background-color: #0369a1;
+    }
+    .btn-stop {
+      background-color: #dc2626;
+      color: #ffffff;
+    }
+    .btn-clear {
+      padding: 0 16px;
+      background-color: #334155;
+      color: #e2e8f0;
+      border: none;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div>
+      <h1>AI 양방향 실시간 동시통역</h1>
+      <div class="header-sub">한국어 ↔ 영어 · 중국어 · 일본어 · 스페인어</div>
+    </div>
+    <div class="header-right">
+      <span id="headerTierBadge" class="tier-badge" title="클릭하여 설정 열기">무료 키</span>
+      <span id="statusBadge" class="status-badge">대기 중</span>
+      <button id="toggleSettingsBtn" class="settings-toggle">설정</button>
+    </div>
+  </header>
+
+  <nav id="quickLangBar" class="quick-lang-bar" aria-label="상대방 언어 빠른 선택">
+    <button type="button" class="quick-lang-btn active" data-lang="en">영어</button>
+    <button type="button" class="quick-lang-btn" data-lang="zh">중국어</button>
+    <button type="button" class="quick-lang-btn" data-lang="ja">일본어</button>
+    <button type="button" class="quick-lang-btn" data-lang="es">스페인어</button>
+  </nav>
+
+  <div class="log-toolbar">
+    <span class="log-toolbar-title">대화 기록 내보내기</span>
+    <div class="log-toolbar-actions">
+      <button id="copyLogBtn" class="btn-tool" type="button">대화 복사</button>
+      <button id="downloadTxtBtn" class="btn-tool" type="button">TXT 저장</button>
+    </div>
+  </div>
+
+  <section id="settingsPanel" class="settings-panel">
+    <div class="tier-selector-box">
+      <div style="font-size: 12px; color: #cbd5e1; font-weight: 600;">사용할 API 키 등급 원터치 선택</div>
+      <div class="tier-switch-grid">
+        <button type="button" id="selectFreeTierBtn" class="tier-choice-btn active-free">일상용 무료 키 사용</button>
+        <button type="button" id="selectPaidTierBtn" class="tier-choice-btn">미팅·학술 유료 키 사용</button>
+      </div>
+
+      <div class="field-group">
+        <label for="freeApiKeyInput">1. 일상용 무료 API 키 (Free Tier)</label>
+        <div class="api-key-row">
+          <input type="password" id="freeApiKeyInput" placeholder="무료 프로젝트 AIzaSy..." />
+          <button type="button" class="btn-key-toggle" data-target="freeApiKeyInput">표시</button>
+          <button type="button" class="btn-file-load" data-file-target="freeKeyFileInput">파일</button>
+          <input type="file" id="freeKeyFileInput" accept=".txt,.env,.json,text/plain" style="display: none;" />
+        </div>
+      </div>
+
+      <div class="field-group">
+        <label for="paidApiKeyInput">2. 미팅·학술용 유료 API 키 (결제 연결 프로젝트)</label>
+        <div class="api-key-row">
+          <input type="password" id="paidApiKeyInput" placeholder="유료 프로젝트 AIzaSy..." />
+          <button type="button" class="btn-key-toggle" data-target="paidApiKeyInput">표시</button>
+          <button type="button" class="btn-file-load" data-file-target="paidKeyFileInput">파일</button>
+          <input type="file" id="paidKeyFileInput" accept=".txt,.env,.json,text/plain" style="display: none;" />
+        </div>
+      </div>
+
+      <div id="keyStatusMsg" class="key-status-msg"></div>
+    </div>
+
+    <div class="row-2">
+      <div class="field-group">
+        <label for="partnerLangSelect">상대방 주 사용 언어</label>
+        <select id="partnerLangSelect">
+          <option value="en">영어 (English)</option>
+          <option value="zh">중국어 (中文/普通话)</option>
+          <option value="ja">일본어 (日本語)</option>
+          <option value="es">스페인어 (Español)</option>
+        </select>
+      </div>
+      <div class="field-group">
+        <label for="listenDetectSelect">상대방 말 듣기 감지 방식</label>
+        <select id="listenDetectSelect">
+          <option value="auto">4개국어 자동 감지</option>
+          <option value="fixed">지정한 상대 언어만 집중</option>
+        </select>
+      </div>
+    </div>
+    <div class="row-2">
+      <div class="field-group">
+        <label for="voiceOutputSelect">통역 음성 출력</label>
+        <select id="voiceOutputSelect">
+          <option value="on">자막 + 실시간 음성 출력</option>
+          <option value="off">자막만 보기 (무음 모드)</option>
+        </select>
+      </div>
+      <div class="field-group">
+        <label for="toneSelect">통역 어투 및 존댓말</label>
+        <select id="toneSelect">
+          <option value="polite">자연스러운 존댓말/정중체</option>
+          <option value="casual">구어체/친근한 대화</option>
+          <option value="formal">격식체 (비즈니스/학술)</option>
+        </select>
+      </div>
+    </div>
+    <div class="row-2">
+      <div class="field-group">
+        <label for="modelInput">실시간 모델 ID</label>
+        <input type="text" id="modelInput" value="gemini-2.5-flash" />
+      </div>
+      <div class="field-group">
+        <label for="voiceNameSelect">AI 통역사 목소리</label>
+        <select id="voiceNameSelect">
+          <option value="Aoede">Aoede (차분한 여성)</option>
+          <option value="Puck">Puck (경쾌한 남성)</option>
+          <option value="Charon">Charon (중후한 남성)</option>
+          <option value="Kore">Kore (명료한 여성)</option>
+        </select>
+      </div>
+    </div>
+    <div class="field-group">
+      <label for="glossaryInput">상황 및 전문 용어집 (선택 입력)</label>
+      <textarea id="glossaryInput" placeholder="예: 해외 바이어 미팅 또는 학술 교류. 고유명사나 전문 용어를 적어두면 양방향 모두 정확히 반영됩니다."></textarea>
+    </div>
+  </section>
+
+  <main id="transcriptBox" class="transcript-container">
+    <div class="bubble system">
+      설정에서 무료 키와 유료 키를 각각 저장해 두고 상황에 맞게 원터치로 전환할 수 있습니다.<br />
+      상단 언어나 하단 방향 버튼을 눌러 실시간 양방향 통역을 시작하세요.
+    </div>
+  </main>
+
+  <footer class="controls">
+    <div class="visualizer-bar">
+      <div id="volumeFill" class="visualizer-fill"></div>
+    </div>
+    <button id="directionToggleBtn" class="direction-btn" type="button">
+      <span id="directionLabel">상대방 말 통역 (영·중·일·스페인어 → 한국어)</span>
+      <span class="direction-badge">탭하여 전환</span>
+    </button>
+    <div class="btn-row">
+      <button id="mainActionBtn" class="btn-main btn-start">통역 시작</button>
+      <button id="clearBtn" class="btn-clear">지우기</button>
+    </div>
+  </footer>
+
+  <script>
+    const headerTierBadge = document.getElementById("headerTierBadge");
+    const selectFreeTierBtn = document.getElementById("selectFreeTierBtn");
+    const selectPaidTierBtn = document.getElementById("selectPaidTierBtn");
+    const freeApiKeyInput = document.getElementById("freeApiKeyInput");
+    const paidApiKeyInput = document.getElementById("paidApiKeyInput");
+    const freeKeyFileInput = document.getElementById("freeKeyFileInput");
+    const paidKeyFileInput = document.getElementById("paidKeyFileInput");
+    const keyStatusMsg = document.getElementById("keyStatusMsg");
+
+    const partnerLangSelect = document.getElementById("partnerLangSelect");
+    const listenDetectSelect = document.getElementById("listenDetectSelect");
+    const voiceOutputSelect = document.getElementById("voiceOutputSelect");
+    const toneSelect = document.getElementById("toneSelect");
+    const modelInput = document.getElementById("modelInput");
+    const voiceNameSelect = document.getElementById("voiceNameSelect");
+    const glossaryInput = document.getElementById("glossaryInput");
+    const settingsPanel = document.getElementById("settingsPanel");
+    const toggleSettingsBtn = document.getElementById("toggleSettingsBtn");
+    const quickLangBtns = document.querySelectorAll(".quick-lang-btn");
+    const statusBadge = document.getElementById("statusBadge");
+    const transcriptBox = document.getElementById("transcriptBox");
+    const copyLogBtn = document.getElementById("copyLogBtn");
+    const downloadTxtBtn = document.getElementById("downloadTxtBtn");
+    const directionToggleBtn = document.getElementById("directionToggleBtn");
+    const directionLabel = document.getElementById("directionLabel");
+    const mainActionBtn = document.getElementById("mainActionBtn");
+    const clearBtn = document.getElementById("clearBtn");
+    const volumeFill = document.getElementById("volumeFill");
+
+    const LANG_NAMES = {
+      en: { ko: "영어", en: "English" },
+      zh: { ko: "중국어", en: "Mandarin Chinese" },
+      ja: { ko: "일본어", en: "Japanese" },
+      es: { ko: "스페인어", en: "Spanish" }
+    };
+
+    let activeKeyTier = "free"; // "free" | "paid"
+    let ws = null;
+    let isRunning = false;
+    let directionMode = "to_ko";
+    let micStream = null;
+    let inputAudioCtx = null;
+    let processorNode = null;
+    let outputAudioCtx = null;
+    let nextPlayTime = 0;
+    let activeSources = [];
+    let wakeLock = null;
+    let currentTranslatedBubble = null;
+    let currentUserBubble = null;
+
+    window.addEventListener("DOMContentLoaded", () => {
+      // 이전 단일 키 저장 데이터 호환 마이그레이션
+      const legacyKey = localStorage.getItem("gemini_rt_api_key");
+      const savedFreeKey = localStorage.getItem("gemini_rt_free_key") || legacyKey || "";
+      const savedPaidKey = localStorage.getItem("gemini_rt_paid_key") || "";
+      const savedTier = localStorage.getItem("gemini_rt_active_tier") || "free";
+
+      const savedPartner = localStorage.getItem("gemini_rt_partner_lang");
+      const savedDetect = localStorage.getItem("gemini_rt_listen_detect");
+      const savedVoiceOut = localStorage.getItem("gemini_rt_voice_out");
+      const savedTone = localStorage.getItem("gemini_rt_tone");
+      const savedModel = localStorage.getItem("gemini_rt_model");
+      const savedVoiceName = localStorage.getItem("gemini_rt_voice_name");
+      const savedGlossary = localStorage.getItem("gemini_rt_glossary");
+
+      freeApiKeyInput.value = savedFreeKey;
+      paidApiKeyInput.value = savedPaidKey;
+      activeKeyTier = savedTier === "paid" ? "paid" : "free";
+
+      if (savedFreeKey || savedPaidKey) {
+        settingsPanel.classList.add("hidden");
+      }
+      if (savedPartner) partnerLangSelect.value = savedPartner;
+      if (savedDetect) listenDetectSelect.value = savedDetect;
+      if (savedVoiceOut) voiceOutputSelect.value = savedVoiceOut;
+      if (savedTone) toneSelect.value = savedTone;
+      if (savedModel) modelInput.value = savedModel;
+      if (savedVoiceName) voiceNameSelect.value = savedVoiceName;
+      if (savedGlossary) glossaryInput.value = savedGlossary;
+
+      updateTierUI();
+      syncQuickLangUI(partnerLangSelect.value);
+      updateDirectionUI();
+    });
+
+    function saveSettings() {
+      localStorage.setItem("gemini_rt_free_key", freeApiKeyInput.value.trim());
+      localStorage.setItem("gemini_rt_paid_key", paidApiKeyInput.value.trim());
+      localStorage.setItem("gemini_rt_active_tier", activeKeyTier);
+      localStorage.setItem("gemini_rt_partner_lang", partnerLangSelect.value);
+      localStorage.setItem("gemini_rt_listen_detect", listenDetectSelect.value);
+      localStorage.setItem("gemini_rt_voice_out", voiceOutputSelect.value);
+      localStorage.setItem("gemini_rt_tone", toneSelect.value);
+      localStorage.setItem("gemini_rt_model", modelInput.value.trim());
+      localStorage.setItem("gemini_rt_voice_name", voiceNameSelect.value);
+      localStorage.setItem("gemini_rt_glossary", glossaryInput.value.trim());
+    }
+
+    function updateTierUI() {
+      if (activeKeyTier === "free") {
+        selectFreeTierBtn.classList.add("active-free");
+        selectPaidTierBtn.classList.remove("active-paid");
+        headerTierBadge.textContent = "무료 키";
+        headerTierBadge.classList.remove("paid");
+        keyStatusMsg.style.color = "#60a5fa";
+        keyStatusMsg.textContent = freeApiKeyInput.value.trim()
+          ? "현재 [일상용 무료 키]가 선택되어 있습니다."
+          : "일상용 무료 키를 입력하거나 파일로 불러와 주세요.";
+      } else {
+        selectPaidTierBtn.classList.add("active-paid");
+        selectFreeTierBtn.classList.remove("active-free");
+        headerTierBadge.textContent = "유료 키";
+        headerTierBadge.classList.add("paid");
+        keyStatusMsg.style.color = "#fbbf24";
+        keyStatusMsg.textContent = paidApiKeyInput.value.trim()
+          ? "현재 [미팅·학술용 유료 키]가 선택되어 있습니다."
+          : "미팅·학술용 유료 키를 입력하거나 파일로 불러와 주세요.";
+      }
+    }
+
+    function switchKeyTier(newTier) {
+      if (activeKeyTier === newTier) return;
+      activeKeyTier = newTier;
+      saveSettings();
+      updateTierUI();
+
+      if (isRunning) {
+        addSystemMessage(`API 키 등급이 [${newTier === "free" ? "무료 키" : "유료 키"}]로 변경되었습니다. 새 키로 세션을 다시 연결합니다.`);
+        stopSession();
+        setTimeout(() => startSession(), 250);
+      }
+    }
+
+    selectFreeTierBtn.addEventListener("click", () => switchKeyTier("free"));
+    selectPaidTierBtn.addEventListener("click", () => switchKeyTier("paid"));
+
+    headerTierBadge.addEventListener("click", () => {
+      settingsPanel.classList.remove("hidden");
+    });
+
+    freeApiKeyInput.addEventListener("input", () => {
+      saveSettings();
+      if (activeKeyTier === "free") updateTierUI();
+    });
+
+    paidApiKeyInput.addEventListener("input", () => {
+      saveSettings();
+      if (activeKeyTier === "paid") updateTierUI();
+    });
+
+    // 비밀번호 표시/숨김 버튼 공통 처리
+    document.querySelectorAll(".btn-key-toggle").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const targetInput = document.getElementById(btn.dataset.target);
+        if (!targetInput) return;
+        if (targetInput.type === "password") {
+          targetInput.type = "text";
+          btn.textContent = "숨김";
+        } else {
+          targetInput.type = "password";
+          btn.textContent = "표시";
+        }
+      });
+    });
+
+    // 파일 불러오기 버튼 공통 처리
+    document.querySelectorAll(".btn-file-load").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const fileInput = document.getElementById(btn.dataset.fileTarget);
+        if (fileInput) {
+          fileInput.value = "";
+          fileInput.click();
+        }
+      });
+    });
+
+    function bindKeyFileLoader(fileInputEl, targetTextInputEl, tierType) {
+      fileInputEl.addEventListener("change", (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const rawText = (e.target.result || "").trim();
+          if (!rawText) {
+            keyStatusMsg.style.color = "#f87171";
+            keyStatusMsg.textContent = "선택한 파일이 비어 있습니다.";
+            return;
+          }
+
+          const keyMatch = rawText.match(/AIza[0-9A-Za-z\-_]{30,}/);
+          const extractedKey = keyMatch ? keyMatch[0] : rawText.split(/\r?\n/)[0].trim();
+
+          if (!extractedKey) {
+            keyStatusMsg.style.color = "#f87171";
+            keyStatusMsg.textContent = "파일에서 유효한 API 키를 찾지 못했습니다.";
+            return;
+          }
+
+          targetTextInputEl.value = extractedKey;
+          activeKeyTier = tierType;
+          saveSettings();
+          updateTierUI();
+          keyStatusMsg.style.color = "#34d399";
+          keyStatusMsg.textContent = `파일(${file.name})에서 [${tierType === "free" ? "무료 키" : "유료 키"}]를 불러와 적용했습니다.`;
+        };
+
+        reader.onerror = () => {
+          keyStatusMsg.style.color = "#f87171";
+          keyStatusMsg.textContent = "파일을 읽는 중 오류가 발생했습니다.";
+        };
+
+        reader.readAsText(file, "UTF-8");
+      });
+    }
+
+    bindKeyFileLoader(freeKeyFileInput, freeApiKeyInput, "free");
+    bindKeyFileLoader(paidKeyFileInput, paidApiKeyInput, "paid");
+
+    function getActiveApiKey() {
+      return activeKeyTier === "paid"
+        ? paidApiKeyInput.value.trim()
+        : freeApiKeyInput.value.trim();
+    }
+
+    function syncQuickLangUI(langCode) {
+      quickLangBtns.forEach((btn) => {
+        if (btn.dataset.lang === langCode) {
+          btn.classList.add("active");
+        } else {
+          btn.classList.remove("active");
+        }
+      });
+    }
+
+    function selectPartnerLanguage(langCode) {
+      if (!LANG_NAMES[langCode]) return;
+      partnerLangSelect.value = langCode;
+      syncQuickLangUI(langCode);
+      saveSettings();
+      updateDirectionUI();
+
+      if (isRunning) {
+        stopAllPlayingAudio();
+        currentTranslatedBubble = null;
+        currentUserBubble = null;
+        sendDirectionSwitchSignal();
+        const partnerKoName = LANG_NAMES[langCode].ko;
+        addSystemMessage(`상대 언어 변경: ${partnerKoName} 기준으로 실시간 통역 규칙이 전환되었습니다.`);
+      }
+    }
+
+    quickLangBtns.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        selectPartnerLanguage(btn.dataset.lang);
+      });
+    });
+
+    partnerLangSelect.addEventListener("change", () => {
+      selectPartnerLanguage(partnerLangSelect.value);
+    });
+
+    listenDetectSelect.addEventListener("change", () => {
+      saveSettings();
+      updateDirectionUI();
+      if (isRunning && directionMode === "to_ko") {
+        sendDirectionSwitchSignal();
+      }
+    });
+
+    function getFormattedTime() {
+      const now = new Date();
+      const hh = String(now.getHours()).padStart(2, "0");
+      const mm = String(now.getMinutes()).padStart(2, "0");
+      const ss = String(now.getSeconds()).padStart(2, "0");
+      return `${hh}:${mm}:${ss}`;
+    }
+
+    function getFileTimestamp() {
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mo = String(now.getMonth() + 1).padStart(2, "0");
+      const dd = String(now.getDate()).padStart(2, "0");
+      const hh = String(now.getHours()).padStart(2, "0");
+      const mm = String(now.getMinutes()).padStart(2, "0");
+      const ss = String(now.getSeconds()).padStart(2, "0");
+      return `${yyyy}${mo}${dd}_${hh}${mm}${ss}`;
+    }
+
+    function collectTranscriptText() {
+      const bubbles = transcriptBox.querySelectorAll(".bubble:not(.system)");
+      if (bubbles.length === 0) return "";
+
+      const lines = [];
+      bubbles.forEach((b) => {
+        const labelEl = b.querySelector(".bubble-label");
+        const timeEl = b.querySelector(".bubble-time");
+        const contentEl = b.querySelector(".bubble-content");
+
+        const label = labelEl ? labelEl.textContent.trim() : "";
+        const time = timeEl ? timeEl.textContent.trim() : "";
+        const content = contentEl ? contentEl.textContent.trim() : "";
+
+        if (content) {
+          const prefix = time ? `[${time}] ${label}` : `[${label}]`;
+          lines.push(`${prefix}: ${content}`);
+        }
+      });
+      return lines.join("\n\n");
+    }
+
+    copyLogBtn.addEventListener("click", async () => {
+      const text = collectTranscriptText();
+      if (!text) {
+        alert("복사할 대화 기록이 없습니다.");
+        return;
+      }
+
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          const tempArea = document.createElement("textarea");
+          tempArea.value = text;
+          tempArea.style.position = "fixed";
+          tempArea.style.left = "-9999px";
+          document.body.appendChild(tempArea);
+          tempArea.select();
+          document.execCommand("copy");
+          document.body.removeChild(tempArea);
+        }
+
+        const origText = copyLogBtn.textContent;
+        copyLogBtn.textContent = "복사 완료";
+        copyLogBtn.classList.add("success");
+        setTimeout(() => {
+          copyLogBtn.textContent = origText;
+          copyLogBtn.classList.remove("success");
+        }, 1600);
+      } catch (err) {
+        alert("클립보드 복사 중 오류가 발생했습니다: " + err.message);
+      }
+    });
+
+    downloadTxtBtn.addEventListener("click", () => {
+      const text = collectTranscriptText();
+      if (!text) {
+        alert("저장할 대화 기록이 없습니다.");
+        return;
+      }
+
+      const headerInfo = `=== AI 양방향 실시간 동시통역 기록 (${new Date().toLocaleString("ko-KR")}) ===\n\n`;
+      const fullContent = "\uFEFF" + headerInfo + text + "\n";
+      const blob = new Blob([fullContent], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `통역기록_${getFileTimestamp()}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      const origText = downloadTxtBtn.textContent;
+      downloadTxtBtn.textContent = "저장 완료";
+      downloadTxtBtn.classList.add("success");
+      setTimeout(() => {
+        downloadTxtBtn.textContent = origText;
+        downloadTxtBtn.classList.remove("success");
+      }, 1600);
+    });
+
+    function updateDirectionUI() {
+      const partnerCode = partnerLangSelect.value;
+      const partnerKoName = LANG_NAMES[partnerCode].ko;
+      const detectMode = listenDetectSelect.value;
+
+      if (directionMode === "to_ko") {
+        directionToggleBtn.classList.remove("to-foreign");
+        const srcText = detectMode === "auto" ? "영·중·일·스페인어" : partnerKoName;
+        directionLabel.textContent = `상대방 말 통역 (${srcText} → 한국어)`;
+      } else {
+        directionToggleBtn.classList.add("to-foreign");
+        directionLabel.textContent = `내 말 전달하기 (한국어 → ${partnerKoName})`;
+      }
+    }
+
+    directionToggleBtn.addEventListener("click", () => {
+      directionMode = directionMode === "to_ko" ? "from_ko" : "to_ko";
+      updateDirectionUI();
+
+      if (isRunning) {
+        stopAllPlayingAudio();
+        currentTranslatedBubble = null;
+        currentUserBubble = null;
+        sendDirectionSwitchSignal();
+
+        const partnerKoName = LANG_NAMES[partnerLangSelect.value].ko;
+        if (directionMode === "to_ko") {
+          addSystemMessage("모드 전환: 상대방의 외국어 음성을 한국어로 통역합니다.");
+        } else {
+          addSystemMessage(`모드 전환: 지금부터 한국어로 말씀하시면 ${partnerKoName}로 통역합니다.`);
+        }
+      }
+    });
+
+    toggleSettingsBtn.addEventListener("click", () => {
+      settingsPanel.classList.toggle("hidden");
+    });
+
+    clearBtn.addEventListener("click", () => {
+      if (transcriptBox.querySelectorAll(".bubble:not(.system)").length > 0) {
+        if (!confirm("화면에 표시된 대화 기록을 모두 지우시겠습니까?")) return;
+      }
+      transcriptBox.innerHTML = "";
+      currentTranslatedBubble = null;
+      currentUserBubble = null;
+    });
+
+    mainActionBtn.addEventListener("click", () => {
+      if (isRunning) {
+        stopSession();
+      } else {
+        startSession();
+      }
+    });
+
+    function setStatus(text, type = "normal") {
+      statusBadge.textContent = text;
+      statusBadge.className = "status-badge";
+      if (type === "connected") statusBadge.classList.add("connected");
+      if (type === "error") statusBadge.classList.add("error");
+    }
+
+    function addSystemMessage(msg) {
+      const div = document.createElement("div");
+      div.className = "bubble system";
+      div.textContent = msg;
+      transcriptBox.appendChild(div);
+      transcriptBox.scrollTop = transcriptBox.scrollHeight;
+    }
+
+    function createBubbleElement(typeClass, labelText, labelColor = "") {
+      const bubble = document.createElement("div");
+      bubble.className = `bubble ${typeClass}`;
+
+      const header = document.createElement("div");
+      header.className = "bubble-header";
+
+      const label = document.createElement("span");
+      label.className = "bubble-label";
+      if (labelColor) label.style.color = labelColor;
+      label.textContent = labelText;
+
+      const time = document.createElement("span");
+      time.className = "bubble-time";
+      time.textContent = getFormattedTime();
+
+      header.appendChild(label);
+      header.appendChild(time);
+
+      const content = document.createElement("span");
+      content.className = "bubble-content";
+
+      bubble.appendChild(header);
+      bubble.appendChild(content);
+      transcriptBox.appendChild(bubble);
+      return bubble;
+    }
+
+    function appendTranslatedText(text) {
+      if (!text) return;
+      if (!currentTranslatedBubble) {
+        const partnerKoName = LANG_NAMES[partnerLangSelect.value].ko;
+        if (directionMode === "to_ko") {
+          currentTranslatedBubble = createBubbleElement("translated-ko", "한국어 통역");
+        } else {
+          currentTranslatedBubble = createBubbleElement("translated-foreign", `${partnerKoName} 통역 출력`);
+        }
+      }
+      const contentSpan = currentTranslatedBubble.querySelector(".bubble-content");
+      contentSpan.textContent += text;
+      transcriptBox.scrollTop = transcriptBox.scrollHeight;
+    }
+
+    function appendUserTranscript(text) {
+      if (!text) return;
+      if (!currentUserBubble) {
+        const labelText = directionMode === "to_ko" ? "상대방 원문 인식" : "내 한국어 인식";
+        currentUserBubble = createBubbleElement("user-speech", labelText, "#94a3b8");
+      }
+      const contentSpan = currentUserBubble.querySelector(".bubble-content");
+      contentSpan.textContent += text;
+      transcriptBox.scrollTop = transcriptBox.scrollHeight;
+    }
+
+    function getDirectionDirectiveText() {
+      const partnerCode = partnerLangSelect.value;
+      const partnerInfo = LANG_NAMES[partnerCode];
+      const detectMode = listenDetectSelect.value;
+      const tone = toneSelect.value;
+
+      let toneDesc = "자연스럽고 정중한 존댓말(해요체/하십시오체 및 해당 언어의 공손한 회화체)";
+      if (tone === "casual") {
+        toneDesc = "자연스럽고 친근한 일상 구어체";
+      } else if (tone === "formal") {
+        toneDesc = "비즈니스 협상, 학술 교류 및 공식 석상에 적합한 격식체";
+      }
+
+      if (directionMode === "to_ko") {
+        const srcConstraint = detectMode === "auto"
+          ? "영어(English), 중국어(Chinese), 일본어(Japanese), 스페인어(Spanish) 음성을 자동 판별하여"
+          : `${partnerInfo.ko}(${partnerInfo.en}) 음성을 집중 인식하여`;
+        return `[현재 통역 방향: 외국어 → 한국어] 입력되는 ${srcConstraint} ${toneDesc}의 한국어(Korean)로만 즉시 동시통역하십시오. 절대 다른 언어로 답하지 마십시오.`;
+      } else {
+        return `[현재 통역 방향: 한국어 → ${partnerInfo.ko}] 입력되는 한국어(Korean) 음성을 ${toneDesc}의 자연스러운 ${partnerInfo.ko}(${partnerInfo.en})로만 즉시 동시통역하여 발화하십시오. 한국어로 대답하거나 반복하지 마십시오.`;
+      }
+    }
+
+    function buildSystemInstruction() {
+      const glossary = glossaryInput.value.trim();
+      let prompt = [
+        "당신은 한국어, 영어, 중국어, 일본어, 스페인어를 자유자재로 구사하는 최고 수준의 실시간 양방향 동시통역사입니다.",
+        getDirectionDirectiveText(),
+        "규칙 1: '네, 알겠습니다', '번역해 드리겠습니다' 같은 인사말, 부연 설명, 주석을 일절 덧붙이지 말고 오직 통역된 결과 문장만 출력하십시오.",
+        "규칙 2: 단어 대 단어의 기계적 직역을 피하고 앞뒤 대화 맥락, 화자의 의도, 생략된 주어를 자연스럽게 살려 원어민처럼 매끄럽게 통역하십시오.",
+        "규칙 3: 통역 방향 전환 신호([현재 통역 방향: ...])가 전달되면 즉시 해당 방향의 언어 규칙으로 전환하고 신호 자체에는 대답하지 마십시오."
+      ].join("\n");
+
+      if (glossary) {
+        prompt += `\n[상황 및 필수 용어집]\n${glossary}`;
+      }
+      return prompt;
+    }
+
+    function sendDirectionSwitchSignal() {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      const directive = getDirectionDirectiveText();
+      ws.send(JSON.stringify({
+        clientContent: {
+          turns: [{
+            role: "user",
+            parts: [{
+              text: `${directive} (이 지시문에는 응답하지 말고 다음 음성 입력부터 바로 통역만 출력하십시오.)`
+            }]
+          }],
+          turnComplete: true
+        }
+      }));
+    }
+
+    async function requestWakeLock() {
+      try {
+        if ("wakeLock" in navigator) {
+          wakeLock = await navigator.wakeLock.request("screen");
+        }
+      } catch (e) {
+        console.warn("WakeLock 미지원 또는 거부:", e);
+      }
+    }
+
+    function releaseWakeLock() {
+      if (wakeLock) {
+        wakeLock.release().catch(() => {});
+        wakeLock = null;
+      }
+    }
+
+    async function startSession() {
+      const apiKey = getActiveApiKey();
+      const tierLabel = activeKeyTier === "paid" ? "유료 키" : "무료 키";
+
+      if (!apiKey) {
+        alert(`선택된 [${tierLabel}]가 비어 있습니다. 설정창에서 해당 API 키를 입력하거나 파일로 불러와 주세요.`);
+        settingsPanel.classList.remove("hidden");
+        if (activeKeyTier === "paid") {
+          paidApiKeyInput.focus();
+        } else {
+          freeApiKeyInput.focus();
+        }
+        return;
+      }
+
+      saveSettings();
+      settingsPanel.classList.add("hidden");
+      setStatus("연결 중...", "normal");
+      mainActionBtn.disabled = true;
+
+      try {
+        micStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            channelCount: 1,
+            sampleRate: 16000,
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
+        });
+
+        outputAudioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+        if (outputAudioCtx.state === "suspended") {
+          await outputAudioCtx.resume();
+        }
+        nextPlayTime = outputAudioCtx.currentTime;
+
+        const modelName = modelInput.value.trim() || "gemini-2.5-flash";
+        const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${encodeURIComponent(apiKey)}`;
+        ws = new WebSocket(wsUrl);
+
+        ws.onopen = () => {
+          const useVoice = voiceOutputSelect.value === "on";
+          const voiceName = voiceNameSelect.value || "Aoede";
+          const setupPayload = {
+            setup: {
+              model: `models/${modelName}`,
+              generationConfig: {
+                responseModalities: useVoice ? ["AUDIO"] : ["TEXT"],
+                speechConfig: useVoice ? {
+                  voiceConfig: {
+                    prebuiltVoiceConfig: {
+                      voiceName: voiceName
+                    }
+                  }
+                } : undefined
+              },
+              systemInstruction: {
+                parts: [{ text: buildSystemInstruction() }]
+              },
+              inputAudioTranscription: {},
+              outputAudioTranscription: useVoice ? {} : undefined
+            }
+          };
+          ws.send(JSON.stringify(setupPayload));
+          startMicCapture();
+          requestWakeLock();
+
+          isRunning = true;
+          mainActionBtn.disabled = false;
+          mainActionBtn.textContent = "통역 중지";
+          mainActionBtn.className = "btn-main btn-stop";
+          setStatus("실시간 통역 중", "connected");
+
+          const partnerKoName = LANG_NAMES[partnerLangSelect.value].ko;
+          if (directionMode === "to_ko") {
+            addSystemMessage(`[${tierLabel}] 통역이 시작되었습니다. 상대방의 외국어 말을 한국어로 통역합니다.`);
+          } else {
+            addSystemMessage(`[${tierLabel}] 통역이 시작되었습니다. 한국어로 말씀하시면 ${partnerKoName}로 통역합니다.`);
+          }
+        };
+
+        ws.onmessage = async (event) => {
+          let rawText = event.data;
+          if (rawText instanceof Blob) {
+            rawText = await rawText.text();
+          }
+          const data = JSON.parse(rawText);
+          handleServerMessage(data);
+        };
+
+        ws.onerror = (err) => {
+          console.error("WebSocket 오류:", err);
+          setStatus("연결 오류", "error");
+          addSystemMessage("서버 연결 중 오류가 발생했습니다. API 키와 모델명, 네트워크 상태를 확인하세요.");
+          stopSession();
+        };
+
+        ws.onclose = (e) => {
+          if (isRunning) {
+            addSystemMessage(`연결이 종료되었습니다. (코드: ${e.code})`);
+            stopSession();
+          }
+        };
+
+      } catch (err) {
+        console.error("시작 실패:", err);
+        mainActionBtn.disabled = false;
+        setStatus("마이크 오류", "error");
+        alert("마이크 권한을 허용해야 합니다. 브라우저 주소창이 HTTPS(GitHub Pages 등)인지 확인해 주세요.\n오류 내용: " + err.message);
+      }
+    }
+
+    function handleServerMessage(data) {
+      const serverContent = data.serverContent;
+      if (!serverContent) return;
+
+      if (serverContent.interrupted) {
+        stopAllPlayingAudio();
+        currentTranslatedBubble = null;
+        return;
+      }
+
+      if (serverContent.inputTranscription && serverContent.inputTranscription.text) {
+        appendUserTranscript(serverContent.inputTranscription.text);
+      }
+
+      if (serverContent.outputTranscription && serverContent.outputTranscription.text) {
+        currentUserBubble = null;
+        appendTranslatedText(serverContent.outputTranscription.text);
+      }
+
+      if (serverContent.modelTurn && serverContent.modelTurn.parts) {
+        currentUserBubble = null;
+        for (const part of serverContent.modelTurn.parts) {
+          if (part.text) {
+            appendTranslatedText(part.text);
+          }
+          if (part.inlineData && part.inlineData.mimeType && part.inlineData.mimeType.startsWith("audio/pcm")) {
+            if (voiceOutputSelect.value === "on") {
+              playPcmChunk(part.inlineData.data);
+            }
+          }
+        }
+      }
+
+      if (serverContent.turnComplete) {
+        currentTranslatedBubble = null;
+        currentUserBubble = null;
+      }
+    }
+
+    function startMicCapture() {
+      inputAudioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+      const source = inputAudioCtx.createMediaStreamSource(micStream);
+      processorNode = inputAudioCtx.createScriptProcessor(4096, 1, 1);
+
+      processorNode.onaudioprocess = (e) => {
+        if (!isRunning || !ws || ws.readyState !== WebSocket.OPEN) return;
+
+        const float32Data = e.inputBuffer.getChannelData(0);
+
+        let sum = 0;
+        for (let i = 0; i < float32Data.length; i++) {
+          sum += float32Data[i] * float32Data[i];
+        }
+        const rms = Math.sqrt(sum / float32Data.length);
+        const level = Math.min(100, Math.round(rms * 450));
+        volumeFill.style.width = level + "%";
+
+        const int16Buffer = new Int16Array(float32Data.length);
+        for (let i = 0; i < float32Data.length; i++) {
+          const s = Math.max(-1, Math.min(1, float32Data[i]));
+          int16Buffer[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+        }
+        const base64Audio = arrayBufferToBase64(int16Buffer.buffer);
+
+        ws.send(JSON.stringify({
+          realtimeInput: {
+            mediaChunks: [{
+              mimeType: "audio/pcm;rate=16000",
+              data: base64Audio
+            }]
+          }
+        }));
+      };
+
+      source.connect(processorNode);
+      processorNode.connect(inputAudioCtx.destination);
+    }
+
+    function playPcmChunk(base64Data) {
+      if (!outputAudioCtx) return;
+      const arrayBuffer = base64ToArrayBuffer(base64Data);
+      const int16Array = new Int16Array(arrayBuffer);
+      const float32Array = new Float32Array(int16Array.length);
+
+      for (let i = 0; i < int16Array.length; i++) {
+        float32Array[i] = int16Array[i] / 32768.0;
+      }
+
+      const audioBuffer = outputAudioCtx.createBuffer(1, float32Array.length, 24000);
+      audioBuffer.getChannelData(0).set(float32Array);
+
+      const source = outputAudioCtx.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(outputAudioCtx.destination);
+
+      const startTime = Math.max(outputAudioCtx.currentTime, nextPlayTime);
+      source.start(startTime);
+      nextPlayTime = startTime + audioBuffer.duration;
+
+      activeSources.push(source);
+      source.onended = () => {
+        activeSources = activeSources.filter(s => s !== source);
+      };
+    }
+
+    function stopAllPlayingAudio() {
+      for (const src of activeSources) {
+        try { src.stop(); } catch (e) {}
+      }
+      activeSources = [];
+      if (outputAudioCtx) {
+        nextPlayTime = outputAudioCtx.currentTime;
+      }
+    }
+
+    function stopSession() {
+      isRunning = false;
+      releaseWakeLock();
+      stopAllPlayingAudio();
+
+      if (processorNode) {
+        processorNode.disconnect();
+        processorNode = null;
+      }
+      if (inputAudioCtx) {
+        inputAudioCtx.close().catch(() => {});
+        inputAudioCtx = null;
+      }
+      if (micStream) {
+        micStream.getTracks().forEach(track => track.stop());
+        micStream = null;
+      }
+      if (ws) {
+        if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+          ws.close();
+        }
+        ws = null;
+      }
+
+      volumeFill.style.width = "0%";
+      mainActionBtn.disabled = false;
+      mainActionBtn.textContent = "통역 시작";
+      mainActionBtn.className = "btn-main btn-start";
+      setStatus("대기 중", "normal");
+    }
+
+    function arrayBufferToBase64(buffer) {
+      let binary = "";
+      const bytes = new Uint8Array(buffer);
+      const len = bytes.byteLength;
+      for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      return window.btoa(binary);
+    }
+
+    function base64ToArrayBuffer(base64) {
+      const binaryString = window.atob(base64);
+      const len = binaryString.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      return bytes.buffer;
+    }
+  </script>
+</body>
+</html>
