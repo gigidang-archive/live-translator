@@ -283,6 +283,36 @@
       font-size: 13px;
       text-align: center;
     }
+    .bubble.error-diag {
+      background-color: #450a0a;
+      border: 1px solid #dc2626;
+      border-left: 4px solid #ef4444;
+      color: #fecaca;
+      font-size: 13px;
+      line-height: 1.5;
+      word-break: break-word;
+    }
+    .error-diag-title {
+      font-weight: 700;
+      color: #fca5a5;
+      margin-bottom: 4px;
+      font-size: 14px;
+    }
+    .error-diag-reason {
+      background-color: #1f0505;
+      padding: 6px 8px;
+      border-radius: 6px;
+      font-family: monospace;
+      font-size: 12px;
+      color: #fda4af;
+      margin: 6px 0;
+      white-space: pre-wrap;
+    }
+    .error-diag-hint {
+      color: #fef08a;
+      font-size: 12px;
+      margin-top: 4px;
+    }
     .bubble.user-speech {
       background-color: #1e293b;
       border-left: 3px solid #64748b;
@@ -510,8 +540,14 @@
     </div>
     <div class="row-2">
       <div class="field-group">
-        <label for="modelInput">실시간 모델 ID</label>
-        <input type="text" id="modelInput" value="gemini-2.5-flash" />
+        <label for="modelInput">실시간 모델 ID (목록 선택/직접 입력)</label>
+        <input type="text" id="modelInput" list="liveModelList" value="gemini-2.0-flash-exp" />
+        <datalist id="liveModelList">
+          <option value="gemini-2.0-flash-exp"></option>
+          <option value="gemini-2.0-flash-live-001"></option>
+          <option value="gemini-2.5-flash-native-audio-preview-09-2025"></option>
+          <option value="gemini-2.5-flash"></option>
+        </datalist>
       </div>
       <div class="field-group">
         <label for="voiceNameSelect">AI 통역사 목소리</label>
@@ -532,7 +568,7 @@
   <main id="transcriptBox" class="transcript-container">
     <div class="bubble system">
       설정에서 무료 키와 유료 키를 각각 저장해 두고 상황에 맞게 원터치로 전환할 수 있습니다.<br />
-      상단 언어나 하단 방향 버튼을 눌러 실시간 양방향 통역을 시작하세요.
+      연결 문제가 발생하면 구글 서버의 상세 거절 사유와 해결 방법이 화면에 바로 표시됩니다.
     </div>
   </main>
 
@@ -587,9 +623,10 @@
       es: { ko: "스페인어", en: "Spanish" }
     };
 
-    let activeKeyTier = "free"; // "free" | "paid"
+    let activeKeyTier = "free";
     let ws = null;
     let isRunning = false;
+    let isConnecting = false;
     let directionMode = "to_ko";
     let micStream = null;
     let inputAudioCtx = null;
@@ -602,7 +639,6 @@
     let currentUserBubble = null;
 
     window.addEventListener("DOMContentLoaded", () => {
-      // 이전 단일 키 저장 데이터 호환 마이그레이션
       const legacyKey = localStorage.getItem("gemini_rt_api_key");
       const savedFreeKey = localStorage.getItem("gemini_rt_free_key") || legacyKey || "";
       const savedPaidKey = localStorage.getItem("gemini_rt_paid_key") || "";
@@ -701,7 +737,6 @@
       if (activeKeyTier === "paid") updateTierUI();
     });
 
-    // 비밀번호 표시/숨김 버튼 공통 처리
     document.querySelectorAll(".btn-key-toggle").forEach((btn) => {
       btn.addEventListener("click", () => {
         const targetInput = document.getElementById(btn.dataset.target);
@@ -716,7 +751,6 @@
       });
     });
 
-    // 파일 불러오기 버튼 공통 처리
     document.querySelectorAll(".btn-file-load").forEach((btn) => {
       btn.addEventListener("click", () => {
         const fileInput = document.getElementById(btn.dataset.fileTarget);
@@ -841,7 +875,7 @@
     }
 
     function collectTranscriptText() {
-      const bubbles = transcriptBox.querySelectorAll(".bubble:not(.system)");
+      const bubbles = transcriptBox.querySelectorAll(".bubble:not(.system):not(.error-diag)");
       if (bubbles.length === 0) return "";
 
       const lines = [];
@@ -964,7 +998,7 @@
 
     clearBtn.addEventListener("click", () => {
       if (transcriptBox.querySelectorAll(".bubble:not(.system)").length > 0) {
-        if (!confirm("화면에 표시된 대화 기록을 모두 지우시겠습니까?")) return;
+        if (!confirm("화면에 표시된 대화 및 오류 기록을 모두 지우시겠습니까?")) return;
       }
       transcriptBox.innerHTML = "";
       currentTranslatedBubble = null;
@@ -972,7 +1006,7 @@
     });
 
     mainActionBtn.addEventListener("click", () => {
-      if (isRunning) {
+      if (isRunning || isConnecting) {
         stopSession();
       } else {
         startSession();
@@ -990,6 +1024,54 @@
       const div = document.createElement("div");
       div.className = "bubble system";
       div.textContent = msg;
+      transcriptBox.appendChild(div);
+      transcriptBox.scrollTop = transcriptBox.scrollHeight;
+    }
+
+    function analyzeCloseReason(code, reason) {
+      const r = (reason || "").toLowerCase();
+      if (r.includes("not found") || r.includes("bidigeneratecontent") || r.includes("not supported")) {
+        return "해결 처방: 설정창의 [실시간 모델 ID]가 실시간 스트리밍(Live API)을 지원하지 않는 모델명입니다. 입력창을 눌러 목록의 다른 모델(예: gemini-2.0-flash-exp 또는 gemini-2.5-flash-native-audio-preview-09-2025)로 변경해 보세요.";
+      }
+      if (r.includes("api key") || r.includes("permission") || r.includes("unauthenticated")) {
+        return "해결 처방: API 키가 잘못되었거나 만료되었습니다. 설정창에서 [표시] 버튼을 눌러 키 문자열 앞뒤에 공백이나 특수문자가 섞이지 않았는지 확인하세요.";
+      }
+      if (r.includes("referer") || r.includes("origin") || r.includes("blocked")) {
+        return "해결 처방: Google Cloud Console에서 해당 API 키의 [애플리케이션 제한사항]이 웹사이트(HTTP 리퍼러)로 설정되어 웹소켓 연결이 차단되었습니다. 제한사항을 [없음]으로 변경해 주세요.";
+      }
+      if (r.includes("quota") || r.includes("resource_exhausted") || code === 1011) {
+        return "해결 처방: 무료 등급의 분당 사용량 한도를 초과했거나 일시적인 서버 혼잡입니다. 잠시 후 다시 시도하거나 상단 배지를 눌러 [유료 키]로 전환해 보세요.";
+      }
+      if (r.includes("modality") || r.includes("voice") || r.includes("invalid argument")) {
+        return "해결 처방: 선택한 모델이 음성 출력 또는 전사 옵션을 지원하지 않을 수 있습니다. 설정창에서 [통역 음성 출력]을 '자막만 보기'로 바꾸거나 모델 ID를 변경해 보세요.";
+      }
+      if (code === 1008) {
+        return "해결 처방: 정책 위반(1008) 오류입니다. 주로 1) 실시간 모델 ID 불일치, 2) Google Cloud API 키의 HTTP 리퍼러 제한 설정, 3) 잘못된 API 키 입력 때문에 발생합니다.";
+      }
+      return "해결 처방: 네트워크 연결 상태와 설정창의 API 키 및 모델 ID를 다시 한 번 점검해 주세요.";
+    }
+
+    function addErrorDiagnosticMessage(code, reason) {
+      const div = document.createElement("div");
+      div.className = "bubble error-diag";
+
+      const title = document.createElement("div");
+      title.className = "error-diag-title";
+      title.textContent = `연결 종료 진단 (종료 코드: ${code})`;
+
+      const reasonBox = document.createElement("div");
+      reasonBox.className = "error-diag-reason";
+      reasonBox.textContent = reason && reason.trim()
+        ? `서버 반환 사유(e.reason): ${reason}`
+        : "서버 반환 사유(e.reason): 상세 메시지 없음 (핸드셰이크 단계 또는 키 제한 차단)";
+
+      const hint = document.createElement("div");
+      hint.className = "error-diag-hint";
+      hint.textContent = analyzeCloseReason(code, reason);
+
+      div.appendChild(title);
+      div.appendChild(reasonBox);
+      div.appendChild(hint);
       transcriptBox.appendChild(div);
       transcriptBox.scrollTop = transcriptBox.scrollHeight;
     }
@@ -1139,6 +1221,7 @@
       settingsPanel.classList.add("hidden");
       setStatus("연결 중...", "normal");
       mainActionBtn.disabled = true;
+      isConnecting = true;
 
       try {
         micStream = await navigator.mediaDevices.getUserMedia({
@@ -1157,37 +1240,44 @@
         }
         nextPlayTime = outputAudioCtx.currentTime;
 
-        const modelName = modelInput.value.trim() || "gemini-2.5-flash";
+        const modelName = modelInput.value.trim() || "gemini-2.0-flash-exp";
         const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${encodeURIComponent(apiKey)}`;
         ws = new WebSocket(wsUrl);
 
         ws.onopen = () => {
           const useVoice = voiceOutputSelect.value === "on";
           const voiceName = voiceNameSelect.value || "Aoede";
-          const setupPayload = {
-            setup: {
-              model: `models/${modelName}`,
-              generationConfig: {
-                responseModalities: useVoice ? ["AUDIO"] : ["TEXT"],
-                speechConfig: useVoice ? {
-                  voiceConfig: {
-                    prebuiltVoiceConfig: {
-                      voiceName: voiceName
-                    }
-                  }
-                } : undefined
-              },
-              systemInstruction: {
-                parts: [{ text: buildSystemInstruction() }]
-              },
-              inputAudioTranscription: {},
-              outputAudioTranscription: useVoice ? {} : undefined
-            }
+
+          const generationConfig = {
+            responseModalities: useVoice ? ["AUDIO"] : ["TEXT"]
           };
-          ws.send(JSON.stringify(setupPayload));
+          if (useVoice) {
+            generationConfig.speechConfig = {
+              voiceConfig: {
+                prebuiltVoiceConfig: {
+                  voiceName: voiceName
+                }
+              }
+            };
+          }
+
+          const setupObj = {
+            model: `models/${modelName}`,
+            generationConfig: generationConfig,
+            systemInstruction: {
+              parts: [{ text: buildSystemInstruction() }]
+            },
+            inputAudioTranscription: {}
+          };
+          if (useVoice) {
+            setupObj.outputAudioTranscription = {};
+          }
+
+          ws.send(JSON.stringify({ setup: setupObj }));
           startMicCapture();
           requestWakeLock();
 
+          isConnecting = false;
           isRunning = true;
           mainActionBtn.disabled = false;
           mainActionBtn.textContent = "통역 중지";
@@ -1196,9 +1286,9 @@
 
           const partnerKoName = LANG_NAMES[partnerLangSelect.value].ko;
           if (directionMode === "to_ko") {
-            addSystemMessage(`[${tierLabel}] 통역이 시작되었습니다. 상대방의 외국어 말을 한국어로 통역합니다.`);
+            addSystemMessage(`[${tierLabel} / ${modelName}] 통역이 시작되었습니다. 상대방의 외국어 말을 한국어로 통역합니다.`);
           } else {
-            addSystemMessage(`[${tierLabel}] 통역이 시작되었습니다. 한국어로 말씀하시면 ${partnerKoName}로 통역합니다.`);
+            addSystemMessage(`[${tierLabel} / ${modelName}] 통역이 시작되었습니다. 한국어로 말씀하시면 ${partnerKoName}로 통역합니다.`);
           }
         };
 
@@ -1208,25 +1298,35 @@
             rawText = await rawText.text();
           }
           const data = JSON.parse(rawText);
+          if (data.error) {
+            addErrorDiagnosticMessage(data.error.code || "API_ERROR", data.error.message || JSON.stringify(data.error));
+            return;
+          }
           handleServerMessage(data);
         };
 
         ws.onerror = (err) => {
           console.error("WebSocket 오류:", err);
           setStatus("연결 오류", "error");
-          addSystemMessage("서버 연결 중 오류가 발생했습니다. API 키와 모델명, 네트워크 상태를 확인하세요.");
-          stopSession();
         };
 
         ws.onclose = (e) => {
-          if (isRunning) {
-            addSystemMessage(`연결이 종료되었습니다. (코드: ${e.code})`);
-            stopSession();
+          const wasActive = isRunning || isConnecting;
+          const isAbnormal = e.code !== 1000 && e.code !== 1005;
+          if (wasActive) {
+            if (isAbnormal || e.reason) {
+              setStatus(`오류 (${e.code})`, "error");
+              addErrorDiagnosticMessage(e.code, e.reason);
+            } else {
+              addSystemMessage(`통역 세션이 정상 종료되었습니다. (코드: ${e.code})`);
+            }
+            cleanupResources();
           }
         };
 
       } catch (err) {
         console.error("시작 실패:", err);
+        isConnecting = false;
         mainActionBtn.disabled = false;
         setStatus("마이크 오류", "error");
         alert("마이크 권한을 허용해야 합니다. 브라우저 주소창이 HTTPS(GitHub Pages 등)인지 확인해 주세요.\n오류 내용: " + err.message);
@@ -1348,8 +1448,9 @@
       }
     }
 
-    function stopSession() {
+    function cleanupResources() {
       isRunning = false;
+      isConnecting = false;
       releaseWakeLock();
       stopAllPlayingAudio();
 
@@ -1365,17 +1466,21 @@
         micStream.getTracks().forEach(track => track.stop());
         micStream = null;
       }
-      if (ws) {
-        if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
-          ws.close();
-        }
-        ws = null;
-      }
 
       volumeFill.style.width = "0%";
       mainActionBtn.disabled = false;
       mainActionBtn.textContent = "통역 시작";
       mainActionBtn.className = "btn-main btn-start";
+    }
+
+    function stopSession() {
+      cleanupResources();
+      if (ws) {
+        if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+          ws.close(1000, "User stopped");
+        }
+        ws = null;
+      }
       setStatus("대기 중", "normal");
     }
 
