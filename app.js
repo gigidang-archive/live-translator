@@ -13,6 +13,7 @@ document.addEventListener("DOMContentLoaded", () => {
     keyStatusMsg: document.getElementById("keyStatusMsg"),
     voiceNameSelect: document.getElementById("voiceNameSelect"),
     voiceModelSelect: document.getElementById("voiceModelSelect"),
+    ttsVolumeSelect: document.getElementById("ttsVolumeSelect"),
     modelSelect: document.getElementById("modelSelect"),
     summaryModelSelect: document.getElementById("summaryModelSelect"),
     partnerLangSelect: document.getElementById("partnerLangSelect"),
@@ -44,11 +45,16 @@ document.addEventListener("DOMContentLoaded", () => {
     manualTextInput: document.getElementById("manualTextInput"),
     sendTextBtn: document.getElementById("sendTextBtn"),
     mainActionBtn: document.getElementById("mainActionBtn"),
+    voiceToggleBtn: document.getElementById("voiceToggleBtn"),
+    volStepBtn: document.getElementById("volStepBtn"),
     sysAudioBtn: document.getElementById("sysAudioBtn"),
     clearBtn: document.getElementById("clearBtn")
   };
 
+  const VOLUME_STEPS = ["1.0", "0.7", "0.4", "0.2"];
+
   let activeTier = "free";
+  let voiceMuted = false;
   let hasMicHardware = true;
   let lastQuotaWarning = "";
   let committedOrigHistory = "";
@@ -73,40 +79,88 @@ document.addEventListener("DOMContentLoaded", () => {
   navigator.mediaDevices?.addEventListener?.("devicechange", detectMicHardware);
 
   async function bindBluetoothOutputSink(audioCtx) {
-    if (!audioCtx || typeof audioCtx.setSinkId !== "function" || !navigator.mediaDevices?.enumerateDevices) {
-      return;
-    }
+    if (!audioCtx || typeof audioCtx.setSinkId !== "function" || !navigator.mediaDevices?.enumerateDevices) return;
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
       const btOut = devices.find((d) => d.kind === "audiooutput" && /bluetooth|buds|airpods|headset|earphone|이어폰|버즈/i.test(d.label || ""));
-      if (btOut && btOut.deviceId) {
-        await audioCtx.setSinkId(btOut.deviceId);
-      }
+      if (btOut && btOut.deviceId) await audioCtx.setSinkId(btOut.deviceId);
+    } catch (e) {}
+  }
+
+  function syncVolumeStepUI() {
+    if (!el.volStepBtn) return;
+    const rawVal = el.ttsVolumeSelect?.value || "1.0";
+    const pct = Math.round(parseFloat(rawVal) * 100);
+    el.volStepBtn.textContent = `음량 ${pct}%`;
+    el.volStepBtn.classList.toggle("dimmed", voiceMuted);
+  }
+
+  function syncVoiceMuteUI() {
+    if (!el.voiceToggleBtn) return;
+    if (voiceMuted) {
+      el.voiceToggleBtn.textContent = "음성 꺼짐";
+      el.voiceToggleBtn.classList.add("muted");
+      if (el.ch2StateText && !lastQuotaWarning) el.ch2StateText.textContent = "음성 꺼짐(자막전용)";
+    } else {
+      el.voiceToggleBtn.textContent = "음성 켜짐";
+      el.voiceToggleBtn.classList.remove("muted");
+      if (el.ch2StateText && !lastQuotaWarning) el.ch2StateText.textContent = engine.isRunning ? "대기" : "준비됨";
+    }
+    syncVolumeStepUI();
+  }
+
+  function playVolumeLevelTick(volFloat) {
+    try {
+      engine.unlockAudio(false);
+      const ctx = engine.outputCtx;
+      if (!ctx || engine.isSpeaking) return;
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(440 + volFloat * 240, now);
+      g.gain.setValueAtTime(Math.max(0.03, 0.28 * volFloat), now);
+      g.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
+      osc.connect(g);
+      g.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.12);
     } catch (e) {}
   }
 
   const engine = new window.GeminiInterpreterEngine({
     getConfig: () => ({
       activeTier,
+      voiceMuted,
       apiKey: activeTier === "paid" ? (el.paidApiKeyInput?.value.trim() || "") : (el.freeApiKeyInput?.value.trim() || ""),
       backupPaidKey: el.paidApiKeyInput?.value.trim() || "",
       voiceName: el.voiceNameSelect?.value || "Kore",
       voiceModel: el.voiceModelSelect?.value || "fast_neural",
+      ttsVolume: el.ttsVolumeSelect?.value || "1.0",
       modelId: el.modelSelect?.value || "gemini-3.8-flash",
       summaryModelId: el.summaryModelSelect?.value || "gemini-3.8-flash",
       partnerLang: el.partnerLangSelect?.value || "en",
       autoMode: el.autoModeSelect?.value || "to_ko_only",
-      chunkMs: el.chunkIntervalSelect?.value || "2800",
+      chunkMs: el.chunkIntervalSelect?.value || "3000",
       ttsRate: el.ttsRateSelect?.value || "1.15",
       duplexMode: el.duplexModeSelect?.value || "full_duplex",
       tone: el.toneSelect?.value || "polite",
       glossary: el.glossaryInput?.value.trim() || ""
     }),
+    onForceUnmute: () => {
+      voiceMuted = false;
+      saveSettings();
+      syncVoiceMuteUI();
+    },
     onVolume: (level) => {
       if (el.volumeFill) el.volumeFill.style.width = level + "%";
     },
     onCostUpdate: (calls, krw) => {
       if (el.costBadge) {
+        if (calls < 1) {
+          el.costBadge.textContent = "요금 대기";
+          return;
+        }
         el.costBadge.textContent = activeTier === "paid" ? `${calls}회 · 약 ${krw}원` : `${calls}회 · 무료키`;
       }
     },
@@ -115,12 +169,14 @@ document.addEventListener("DOMContentLoaded", () => {
       if (s2 && el.ch2StateText && !lastQuotaWarning) el.ch2StateText.textContent = s2;
     },
     onSpeakingChange: (speaking) => {
-      if (speaking) {
+      if (speaking && !voiceMuted) {
         lastQuotaWarning = "";
         if (el.ch2StateText) el.ch2StateText.textContent = "음성 송출 중";
         setStatus("음성 송출 중", "speaking");
       } else {
-        if (el.ch2StateText && !lastQuotaWarning) el.ch2StateText.textContent = "대기";
+        if (el.ch2StateText && !lastQuotaWarning) {
+          el.ch2StateText.textContent = voiceMuted ? "음성 꺼짐(자막전용)" : "대기";
+        }
         if (engine.isRunning && !lastQuotaWarning) setStatus("동시통역 중", "connected");
       }
       updateMicVisual(speaking);
@@ -226,7 +282,7 @@ document.addEventListener("DOMContentLoaded", () => {
       el.micStateLabel.textContent = "텍스트 전용";
       return;
     }
-    if (speaking && engine.driverMode === "mic" && el.duplexModeSelect?.value === "smart_guard" && el.autoModeSelect?.value === "auto_both") {
+    if (speaking && !voiceMuted && engine.driverMode === "mic" && el.duplexModeSelect?.value === "smart_guard" && el.autoModeSelect?.value === "auto_both") {
       el.volumeFill.classList.add("muted");
       el.micStateLabel.classList.add("muted");
       el.micStateLabel.textContent = "에코 방지 중";
@@ -241,17 +297,19 @@ document.addEventListener("DOMContentLoaded", () => {
     if (el.paidApiKeyInput) el.paidApiKeyInput.value = localStorage.getItem("gemini_rt_paid_key") || "";
     activeTier = localStorage.getItem("gemini_rt_active_tier") === "paid" ? "paid" : "free";
     if (el.paidApiKeyInput?.value.trim()) activeTier = "paid";
+    voiceMuted = localStorage.getItem("gemini_rt_voice_muted_v13") === "true";
 
     const map = [
-      ["gemini_rt_voice_name_v12", el.voiceNameSelect],
-      ["gemini_rt_voice_model_v12", el.voiceModelSelect],
-      ["gemini_rt_model_v12", el.modelSelect],
-      ["gemini_rt_sum_model_v12", el.summaryModelSelect],
+      ["gemini_rt_voice_name_v13", el.voiceNameSelect],
+      ["gemini_rt_voice_model_v13", el.voiceModelSelect],
+      ["gemini_rt_tts_vol_v13", el.ttsVolumeSelect],
+      ["gemini_rt_model_v13", el.modelSelect],
+      ["gemini_rt_sum_model_v13", el.summaryModelSelect],
       ["gemini_rt_partner_lang", el.partnerLangSelect],
-      ["gemini_rt_auto_mode_v12", el.autoModeSelect],
-      ["gemini_rt_chunk_len_v12", el.chunkIntervalSelect],
-      ["gemini_rt_tts_rate_v12", el.ttsRateSelect],
-      ["gemini_rt_duplex_mode_v12", el.duplexModeSelect],
+      ["gemini_rt_auto_mode_v13", el.autoModeSelect],
+      ["gemini_rt_chunk_len_v13", el.chunkIntervalSelect],
+      ["gemini_rt_tts_rate_v13", el.ttsRateSelect],
+      ["gemini_rt_duplex_mode_v13", el.duplexModeSelect],
       ["gemini_rt_tone", el.toneSelect],
       ["gemini_rt_glossary", el.glossaryInput]
     ];
@@ -263,25 +321,29 @@ document.addEventListener("DOMContentLoaded", () => {
     if ((el.freeApiKeyInput?.value.trim() || el.paidApiKeyInput?.value.trim()) && el.settingsPanel) {
       el.settingsPanel.classList.add("hidden");
     }
+    engine.setVoiceMuted(voiceMuted);
+    engine.applyOutputVolume();
     updateTierUI();
     syncQuickLangUI(el.partnerLangSelect?.value || "en");
     syncDirectionLockUI();
-    if (el.ch2StateText) el.ch2StateText.textContent = "블루투스 호환 엔진 준비됨";
+    syncVoiceMuteUI();
   }
 
   function saveSettings() {
     if (el.freeApiKeyInput) localStorage.setItem("gemini_rt_free_key", el.freeApiKeyInput.value.trim());
     if (el.paidApiKeyInput) localStorage.setItem("gemini_rt_paid_key", el.paidApiKeyInput.value.trim());
     localStorage.setItem("gemini_rt_active_tier", activeTier);
-    if (el.voiceNameSelect) localStorage.setItem("gemini_rt_voice_name_v12", el.voiceNameSelect.value);
-    if (el.voiceModelSelect) localStorage.setItem("gemini_rt_voice_model_v12", el.voiceModelSelect.value);
-    if (el.modelSelect) localStorage.setItem("gemini_rt_model_v12", el.modelSelect.value);
-    if (el.summaryModelSelect) localStorage.setItem("gemini_rt_sum_model_v12", el.summaryModelSelect.value);
+    localStorage.setItem("gemini_rt_voice_muted_v13", String(voiceMuted));
+    if (el.voiceNameSelect) localStorage.setItem("gemini_rt_voice_name_v13", el.voiceNameSelect.value);
+    if (el.voiceModelSelect) localStorage.setItem("gemini_rt_voice_model_v13", el.voiceModelSelect.value);
+    if (el.ttsVolumeSelect) localStorage.setItem("gemini_rt_tts_vol_v13", el.ttsVolumeSelect.value);
+    if (el.modelSelect) localStorage.setItem("gemini_rt_model_v13", el.modelSelect.value);
+    if (el.summaryModelSelect) localStorage.setItem("gemini_rt_sum_model_v13", el.summaryModelSelect.value);
     if (el.partnerLangSelect) localStorage.setItem("gemini_rt_partner_lang", el.partnerLangSelect.value);
-    if (el.autoModeSelect) localStorage.setItem("gemini_rt_auto_mode_v12", el.autoModeSelect.value);
-    if (el.chunkIntervalSelect) localStorage.setItem("gemini_rt_chunk_len_v12", el.chunkIntervalSelect.value);
-    if (el.ttsRateSelect) localStorage.setItem("gemini_rt_tts_rate_v12", el.ttsRateSelect.value);
-    if (el.duplexModeSelect) localStorage.setItem("gemini_rt_duplex_mode_v12", el.duplexModeSelect.value);
+    if (el.autoModeSelect) localStorage.setItem("gemini_rt_auto_mode_v13", el.autoModeSelect.value);
+    if (el.chunkIntervalSelect) localStorage.setItem("gemini_rt_chunk_len_v13", el.chunkIntervalSelect.value);
+    if (el.ttsRateSelect) localStorage.setItem("gemini_rt_tts_rate_v13", el.ttsRateSelect.value);
+    if (el.duplexModeSelect) localStorage.setItem("gemini_rt_duplex_mode_v13", el.duplexModeSelect.value);
     if (el.toneSelect) localStorage.setItem("gemini_rt_tone", el.toneSelect.value);
     if (el.glossaryInput) localStorage.setItem("gemini_rt_glossary", el.glossaryInput.value.trim());
   }
@@ -301,9 +363,7 @@ document.addEventListener("DOMContentLoaded", () => {
       el.headerTierBadge.textContent = "유료 키";
       el.headerTierBadge.classList.add("paid");
       el.keyStatusMsg.style.color = "#fbbf24";
-      el.keyStatusMsg.textContent = el.paidApiKeyInput?.value.trim()
-        ? "유료 키 활성 (블루투스 미디어 모드 지원)"
-        : "유료 키를 입력해 주세요.";
+      el.keyStatusMsg.textContent = el.paidApiKeyInput?.value.trim() ? "유료 키 활성" : "유료 키를 입력해 주세요.";
     }
   }
 
@@ -366,14 +426,39 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   el.glossaryInput?.addEventListener("input", saveSettings);
 
-  [el.voiceNameSelect, el.voiceModelSelect, el.modelSelect, el.summaryModelSelect, el.chunkIntervalSelect, el.ttsRateSelect, el.duplexModeSelect, el.toneSelect].forEach((n) => {
+  [el.voiceNameSelect, el.voiceModelSelect, el.ttsVolumeSelect, el.modelSelect, el.summaryModelSelect, el.chunkIntervalSelect, el.ttsRateSelect, el.duplexModeSelect, el.toneSelect].forEach((n) => {
     n?.addEventListener("change", () => {
       if (el.modelSelect?.value === "gemini-4-carbon" && activeTier === "free" && el.paidApiKeyInput?.value.trim()) {
         activeTier = "paid";
         updateTierUI();
       }
+      engine.applyOutputVolume();
+      syncVolumeStepUI();
       saveSettings();
     });
+  });
+
+  el.voiceToggleBtn?.addEventListener("click", () => {
+    voiceMuted = !voiceMuted;
+    engine.setVoiceMuted(voiceMuted);
+    saveSettings();
+    syncVoiceMuteUI();
+  });
+
+  el.volStepBtn?.addEventListener("click", () => {
+    if (voiceMuted) {
+      voiceMuted = false;
+      engine.setVoiceMuted(false);
+    } else {
+      const curVal = el.ttsVolumeSelect?.value || "1.0";
+      const curIdx = VOLUME_STEPS.indexOf(curVal);
+      const nextVal = VOLUME_STEPS[(curIdx + 1) % VOLUME_STEPS.length];
+      if (el.ttsVolumeSelect) el.ttsVolumeSelect.value = nextVal;
+    }
+    engine.applyOutputVolume();
+    saveSettings();
+    syncVoiceMuteUI();
+    playVolumeLevelTick(parseFloat(el.ttsVolumeSelect?.value || "1.0"));
   });
 
   el.autoModeSelect?.addEventListener("change", () => { syncDirectionLockUI(); saveSettings(); engine.restartForModeChange(); });
@@ -441,6 +526,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     setStatus("동시통역 중", "connected");
     updateMicVisual(false);
+    syncVoiceMuteUI();
 
     if (timerInterval) clearInterval(timerInterval);
     elapsedSec = 1;
@@ -480,8 +566,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     if (el.ch1StateText) el.ch1StateText.textContent = "대기";
     if (!lastQuotaWarning) {
-      if (el.ch2StateText) el.ch2StateText.textContent = "블루투스 호환 엔진 준비됨";
       setStatus("대기", "");
+      syncVoiceMuteUI();
     }
     updateMicVisual(false);
   }
@@ -500,16 +586,15 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    // 모바일 및 이어폰 모드에서는 통화용 스피커폰 전환(echoCancellation)을 끄고 미디어 오디오 경로를 유지함
     const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
     const keepMediaRoute = isMobile || el.duplexModeSelect?.value === "full_duplex" || el.autoModeSelect?.value !== "auto_both";
 
     try {
-      let BuiltInMicId = undefined;
+      let builtInMicId = undefined;
       if (isMobile && navigator.mediaDevices?.enumerateDevices) {
         const devs = await navigator.mediaDevices.enumerateDevices();
         const phoneMic = devs.find((d) => d.kind === "audioinput" && d.deviceId && !/bluetooth|buds|headset|earphone|블루투스/i.test(d.label || ""));
-        if (phoneMic && phoneMic.label) BuiltInMicId = phoneMic.deviceId;
+        if (phoneMic && phoneMic.label) builtInMicId = phoneMic.deviceId;
       }
 
       const audioConstraints = {
@@ -518,9 +603,7 @@ document.addEventListener("DOMContentLoaded", () => {
         noiseSuppression: !keepMediaRoute,
         autoGainControl: true
       };
-      if (BuiltInMicId) {
-        audioConstraints.deviceId = { ideal: BuiltInMicId };
-      }
+      if (builtInMicId) audioConstraints.deviceId = { ideal: builtInMicId };
 
       const micStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
       await beginEngineWithStream(micStream, keepMediaRoute ? "bt_mic" : "mic");
