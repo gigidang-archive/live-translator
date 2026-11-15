@@ -26,6 +26,7 @@ class GeminiInterpreterEngine {
     this.pcmBuffer = [];
     this.voiceSamples = 0;
     this.silenceSamples = 0;
+    this.audioJobQueue = [];
     this.tickTimer = null;
     this.lastDispatchAt = 0;
 
@@ -137,7 +138,7 @@ class GeminiInterpreterEngine {
     this.unlockAudio(true);
     this.stopSpeechOnly();
     this.muteUntilTime = Date.now() + 3000;
-    const msg = "동시통역 음성 출력이 정상 작동합니다.";
+    const msg = "무손실 동시통역 음성 출력이 정상 작동합니다.";
     this.recordSpokenEcho(msg);
     this.enqueueSpeech(msg);
   }
@@ -146,12 +147,33 @@ class GeminiInterpreterEngine {
     this.stop();
     this.isRunning = true;
     this.globalBackoffUntil = 0;
-    this.stream = stream || null;
+
+    let finalStream = stream || null;
+    const cfg = this.cb.getConfig();
+    const isAndroid = /Android/i.test(navigator.userAgent);
+
+    // 안드로이드 단방향 고정 또는 이어폰 모드에서는 통화용 노이즈 게이트를 꺼서 원거리 말소리 끊김을 방지
+    if (finalStream && modeLabel === "mic" && isAndroid && (cfg.autoMode !== "auto_both" || cfg.duplexMode === "full_duplex")) {
+      try {
+        const rawMic = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            channelCount: 1,
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: true
+          }
+        });
+        finalStream.getTracks().forEach((t) => t.stop());
+        finalStream = rawMic;
+      } catch (e) {}
+    }
+
+    this.stream = finalStream;
     this.driverMode = this.stream ? modeLabel : "text_only";
 
     if (this.stream) {
       await this.setupAudioCapture();
-      this.cb.onChannelState(modeLabel === "system_audio" ? "PC 소리 수신 중" : "마이크 수신 중", "대기");
+      this.cb.onChannelState(modeLabel === "system_audio" ? "PC 소리 수신 중" : "연속 수음 중", "대기");
     } else if (this.cb.onNoMicFallback) {
       this.cb.onNoMicFallback();
     }
@@ -160,12 +182,13 @@ class GeminiInterpreterEngine {
 
   restartForModeChange() {
     this.pcmBuffer = [];
+    this.audioJobQueue = [];
     this.voiceSamples = 0;
     this.silenceSamples = 0;
   }
 
   flushRemainingLiveText() {
-    if (this.pcmBuffer.length >= 6400 && this.voiceSamples >= 3200 && Date.now() >= this.globalBackoffUntil) {
+    if (this.pcmBuffer.length >= 6400 && this.voiceSamples >= 2400 && Date.now() >= this.globalBackoffUntil) {
       const rest = new Float32Array(this.pcmBuffer);
       this.pcmBuffer = [];
       this.voiceSamples = 0;
@@ -199,13 +222,12 @@ class GeminiInterpreterEngine {
     const rms = Math.sqrt(sum / pcm16k.length);
 
     for (let i = 0; i < pcm16k.length; i++) this.pcmBuffer.push(pcm16k[i]);
-    if (rms > 0.008) {
+    if (rms > 0.005) {
       this.voiceSamples += pcm16k.length;
       this.silenceSamples = 0;
     } else {
       this.silenceSamples += pcm16k.length;
     }
-    if (this.pcmBuffer.length > 112000) this.pcmBuffer = this.pcmBuffer.slice(-80000);
   }
 
   async setupAudioCapture() {
@@ -218,12 +240,15 @@ class GeminiInterpreterEngine {
     this.analyser.fftSize = 1024;
     const meterArray = new Float32Array(this.analyser.fftSize);
 
-    this.processor = this.inputCtx.createScriptProcessor(2048, 1, 1);
+    this.processor = this.inputCtx.createScriptProcessor(4096, 1, 1);
     this.muteGain = this.inputCtx.createGain();
     this.muteGain.gain.value = 0;
 
     this.processor.onaudioprocess = (e) => {
       if (!this.isRunning) return;
+      if (this.outputCtx && this.outputCtx.state === "suspended") {
+        this.outputCtx.resume().catch(() => {});
+      }
       this.handleIncomingPcmChunk(e.inputBuffer.getChannelData(0), nativeRate);
     };
 
@@ -238,8 +263,8 @@ class GeminiInterpreterEngine {
       let sum = 0;
       for (let i = 0; i < meterArray.length; i++) sum += meterArray[i] * meterArray[i];
       const rms = Math.sqrt(sum / meterArray.length);
-      this.cb.onVolume(Math.min(100, Math.round(rms * 650)));
-    }, 60);
+      this.cb.onVolume(Math.min(100, Math.round(rms * 700)));
+    }, 80);
 
     this.audioSourceNode.connect(this.analyser);
     this.analyser.connect(this.processor);
@@ -247,8 +272,8 @@ class GeminiInterpreterEngine {
     this.muteGain.connect(this.inputCtx.destination);
   }
 
-  findCleanSplitIndex(samples) {
-    const len = samples.length;
+  findCleanSplitIndex(samples, limitLen) {
+    const len = Math.min(samples.length, limitLen);
     const win = 800;
     const start = Math.max(16000, len - 9600);
     let minE = Infinity;
@@ -265,40 +290,35 @@ class GeminiInterpreterEngine {
     if (this.tickTimer) clearInterval(this.tickTimer);
     this.tickTimer = setInterval(() => {
       if (!this.isRunning) return;
-      this.checkAndSliceAudio();
+      this.sliceAudioIntoQueue();
+      this.pumpAudioJobQueue();
       this.releaseStalledSequence();
     }, 150);
   }
 
-  checkAndSliceAudio() {
-    const now = Date.now();
-    if (now < this.globalBackoffUntil) return;
+  // 네트워크 지연과 무관하게 원음을 삭제 없이 무손실 절단하여 큐에 보관
+  sliceAudioIntoQueue() {
+    if (this.pcmBuffer.length === 0) return;
 
     const cfg = this.cb.getConfig();
     const isFree = cfg.activeTier !== "paid";
-    const maxConcurrent = isFree ? 1 : 2;
-    if (this.pcmBuffer.length === 0 || this.inFlightCount >= maxConcurrent) return;
-
-    const minIntervalMs = isFree ? 4300 : 1300;
-    if (now - this.lastDispatchAt < minIntervalMs) return;
-
-    if (this.voiceSamples > 2000) {
-      const sec = (this.pcmBuffer.length / 16000).toFixed(1);
-      this.cb.onChannelState(`음성 수집 (${sec}초)`, this.isSpeaking ? "음성 송출 중" : "대기");
-    }
-
     const baseMs = Math.max(2000, parseInt(cfg.chunkMs, 10) || 2800);
     const targetMs = isFree ? Math.max(4200, baseMs) : baseMs;
     const targetSamples = Math.round((targetMs / 1000) * 16000);
     const maxSamples = targetSamples + 11200;
-
     const minBreathLen = isFree ? 48000 : 25600;
-    const breathCut = this.pcmBuffer.length >= minBreathLen && this.voiceSamples >= 6400 && this.silenceSamples >= 3520;
-    const maxCut = this.pcmBuffer.length >= maxSamples && this.voiceSamples >= 6400;
+
+    if (this.voiceSamples > 1600) {
+      const sec = (this.pcmBuffer.length / 16000).toFixed(1);
+      this.cb.onChannelState(`수음 중 (${sec}초)`, this.isSpeaking ? "음성 송출 중" : "대기");
+    }
+
+    const breathCut = this.pcmBuffer.length >= minBreathLen && this.voiceSamples >= 4800 && this.silenceSamples >= 3200;
+    const maxCut = this.pcmBuffer.length >= maxSamples && this.voiceSamples >= 4800;
 
     if (!breathCut && !maxCut) {
-      if (this.voiceSamples < 1600 && this.pcmBuffer.length > 24000) {
-        this.pcmBuffer = this.pcmBuffer.slice(-2400);
+      if (this.voiceSamples < 1200 && this.pcmBuffer.length > 32000) {
+        this.pcmBuffer = this.pcmBuffer.slice(-3200);
         this.voiceSamples = 0;
       }
       return;
@@ -311,17 +331,36 @@ class GeminiInterpreterEngine {
       this.voiceSamples = 0;
       this.silenceSamples = 0;
     } else {
-      const idx = this.findCleanSplitIndex(this.pcmBuffer);
+      const idx = this.findCleanSplitIndex(this.pcmBuffer, maxSamples);
       sendSlice = new Float32Array(this.pcmBuffer.slice(0, idx));
       this.pcmBuffer = this.pcmBuffer.slice(idx);
-      this.voiceSamples = Math.floor(this.pcmBuffer.length * 0.4);
+      this.voiceSamples = Math.floor(this.pcmBuffer.length * 0.45);
       this.silenceSamples = 0;
     }
 
-    this.lastDispatchAt = now;
-    const seq = ++this.seqCounter;
-    this.dispatchTimes.set(seq, now);
-    this.translateAudioSlice(seq, sendSlice);
+    this.audioJobQueue.push(sendSlice);
+    if (this.audioJobQueue.length > 8) {
+      this.audioJobQueue.shift();
+    }
+  }
+
+  pumpAudioJobQueue() {
+    const now = Date.now();
+    if (now < this.globalBackoffUntil || this.audioJobQueue.length === 0) return;
+
+    const cfg = this.cb.getConfig();
+    const isFree = cfg.activeTier !== "paid";
+    const maxConcurrent = isFree ? 1 : 3;
+    const minIntervalMs = isFree ? 4300 : 600;
+
+    while (this.audioJobQueue.length > 0 && this.inFlightCount < maxConcurrent) {
+      if (Date.now() - this.lastDispatchAt < minIntervalMs) break;
+      const slice = this.audioJobQueue.shift();
+      this.lastDispatchAt = Date.now();
+      const seq = ++this.seqCounter;
+      this.dispatchTimes.set(seq, this.lastDispatchAt);
+      this.translateAudioSlice(seq, slice);
+    }
   }
 
   normalizeCompact(str) {
@@ -334,13 +373,13 @@ class GeminiInterpreterEngine {
     for (const prev of historyList) {
       const pNorm = this.normalizeCompact(prev);
       if (!pNorm) continue;
-      if (norm === pNorm || (pNorm.length >= 8 && pNorm.includes(norm))) return true;
-      if (norm.length >= 10 && pNorm.length >= 10) {
+      if (norm === pNorm || (pNorm.length >= 10 && pNorm.includes(norm))) return true;
+      if (norm.length >= 12 && pNorm.length >= 12) {
         let hit = 0;
         for (let i = 0; i < norm.length - 1; i++) {
           if (pNorm.includes(norm.slice(i, i + 2))) hit++;
         }
-        if (hit / (norm.length - 1) >= 0.72 && norm.length <= pNorm.length * 1.25) return true;
+        if (hit / (norm.length - 1) >= 0.78 && norm.length <= pNorm.length * 1.2) return true;
       }
     }
     return false;
@@ -380,8 +419,8 @@ class GeminiInterpreterEngine {
 
     const oKo = this.getHangulRatio(orig);
     const tKo = this.getHangulRatio(trans);
-    if (cfg.autoMode === "to_ko_only" && (oKo > 0.3 || tKo < 0.35)) return { orig: "", trans: "" };
-    if (cfg.autoMode === "from_ko_only" && (oKo < 0.25 || tKo > 0.25)) return { orig: "", trans: "" };
+    if (cfg.autoMode === "to_ko_only" && (oKo > 0.35 || tKo < 0.3)) return { orig: "", trans: "" };
+    if (cfg.autoMode === "from_ko_only" && (oKo < 0.25 || tKo > 0.3)) return { orig: "", trans: "" };
     return { orig, trans };
   }
 
@@ -416,7 +455,7 @@ class GeminiInterpreterEngine {
     return { orig: "", trans: "" };
   }
 
-  async callSingleModel(modelId, apiKey, parts, temperature = 0.1, timeoutMs = 8500) {
+  async callSingleModel(modelId, apiKey, parts, temperature = 0.1, timeoutMs = 11000) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     const generationConfig = { temperature };
@@ -444,7 +483,7 @@ class GeminiInterpreterEngine {
     }
   }
 
-  async callWithSmartFailover(primaryModel, cfg, parts, temperature = 0.1, timeoutMs = 8500) {
+  async callWithSmartFailover(primaryModel, cfg, parts, temperature = 0.1, timeoutMs = 11000) {
     const now = Date.now();
     const candidates = [primaryModel, "gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-3.6-flash"]
       .filter((m, idx, arr) => m && arr.indexOf(m) === idx);
@@ -481,17 +520,17 @@ class GeminiInterpreterEngine {
       quotaErr.status = 429;
       throw quotaErr;
     }
-    throw lastErr || new Error("API 응답 실패");
+    throw lastErr || new Error("통신 지연");
   }
 
   buildCompactDirectionPrompt(cfg) {
     const pInfo = INTERPRETER_LANGS[cfg.partnerLang] || INTERPRETER_LANGS.en;
     const toneDesc = cfg.tone === "formal" ? "격식체" : (cfg.tone === "casual" ? "구어체" : "존댓말");
     if (cfg.autoMode === "to_ko_only") {
-      return `[${pInfo.ko}→한국어(${toneDesc})] 한국어 소리는 무시. ${pInfo.ko} 발화만 듣고 ORIG와 한국어 TRANS 출력. 말소리 없으면 NONE.`;
+      return `[${pInfo.ko}→한국어(${toneDesc})] 한국어 에코는 무시. ${pInfo.ko} 발화만 듣고 ORIG와 한국어 TRANS 출력. 말소리 없으면 NONE.`;
     }
     if (cfg.autoMode === "from_ko_only") {
-      return `[한국어→${pInfo.ko}(${toneDesc})] 외국어 소리는 무시. 한국어만 듣고 ORIG와 ${pInfo.en} TRANS 출력. 말소리 없으면 NONE.`;
+      return `[한국어→${pInfo.ko}(${toneDesc})] 외국어 에코는 무시. 한국어만 듣고 ORIG와 ${pInfo.en} TRANS 출력. 말소리 없으면 NONE.`;
     }
     return `한국어는 ${pInfo.en}(${toneDesc})로, 외국어는 한국어(${toneDesc})로 통역. 말소리 없으면 NONE.`;
   }
@@ -500,7 +539,7 @@ class GeminiInterpreterEngine {
     const cfg = this.cb.getConfig();
     if (!cfg.apiKey) return;
     this.inFlightCount += 1;
-    this.cb.onChannelState("원음 분석 중", `#${seq} 번역 중`);
+    this.cb.onChannelState("연속 수음 중", `#${seq} 번역 중`);
 
     const wavBase64 = this.encodeWavBase64(float32Samples, 16000);
     const prevOrig = this.recentOrigList.slice(-1)[0] || "";
@@ -513,14 +552,15 @@ class GeminiInterpreterEngine {
 
     const parts = [{ text: prompt }, { inlineData: { mimeType: "audio/wav", data: wavBase64 } }];
     try {
-      const out = await this.callWithSmartFailover(cfg.modelId, cfg, parts, 0.1, 8500);
+      const out = await this.callWithSmartFailover(cfg.modelId, cfg, parts, 0.1, 11000);
       this.pendingResults.set(seq, this.validateAndDeduplicate(this.parseOrigAndTrans(out), cfg));
     } catch (err) {
       this.pendingResults.set(seq, { orig: "", trans: "" });
-      if (this.cb.onError) this.cb.onError(err.message || "API 오류", err.status === 429);
+      if (this.cb.onError) this.cb.onError(err.message || "API 지연", err.status === 429);
     } finally {
       this.inFlightCount = Math.max(0, this.inFlightCount - 1);
       this.commitReadyChunks();
+      this.pumpAudioJobQueue();
     }
   }
 
@@ -539,7 +579,7 @@ class GeminiInterpreterEngine {
         cfg,
         [{ text: `다음 문장을 ${target}로 통역해 결과만 출력:\n${trimmed}` }],
         0.1,
-        8500
+        10000
       );
       this.pendingResults.set(seq, { orig: trimmed, trans: out.trim() });
     } catch (err) {
@@ -549,10 +589,11 @@ class GeminiInterpreterEngine {
     this.commitReadyChunks();
   }
 
+  // 모바일 통신 지연을 고려해 12.5초까지는 정상 응답을 끝까지 기다려 문장 증발 방지
   releaseStalledSequence() {
     while (this.dispatchTimes.has(this.nextCommitSeq)) {
       const sentAt = this.dispatchTimes.get(this.nextCommitSeq);
-      if (!this.pendingResults.has(this.nextCommitSeq) && Date.now() - sentAt > 4500 && this.pendingResults.has(this.nextCommitSeq + 1)) {
+      if (!this.pendingResults.has(this.nextCommitSeq) && Date.now() - sentAt > 12500 && this.pendingResults.has(this.nextCommitSeq + 1)) {
         this.dispatchTimes.delete(this.nextCommitSeq);
         this.nextCommitSeq += 1;
       } else break;
@@ -578,17 +619,17 @@ class GeminiInterpreterEngine {
         this.enqueueSpeech(item.trans);
         this.cb.onChunkCommitted(seq, item.orig, item.trans);
       } else if (!this.isSpeaking && Date.now() >= this.globalBackoffUntil) {
-        this.cb.onChannelState(this.driverMode === "system_audio" ? "PC 소리 수신 중" : "원음 수신 중", "대기");
+        this.cb.onChannelState(this.driverMode === "system_audio" ? "PC 소리 수신 중" : "연속 수음 중", "대기");
       }
     }
   }
 
+  // 대기 중인 문장을 하나도 삭제하지 않고 한 호흡으로 자연스럽게 이어붙임
   enqueueSpeech(text) {
     const clean = (text || "").trim();
     if (!clean) return;
-    if (this.speechQueue.length >= 2) {
-      const last = this.speechQueue[this.speechQueue.length - 1];
-      this.speechQueue = [last + " " + clean];
+    if (this.isSpeaking && this.speechQueue.length >= 1) {
+      this.speechQueue = [this.speechQueue.join(" ") + " " + clean];
     } else {
       this.speechQueue.push(clean);
     }
@@ -614,13 +655,13 @@ class GeminiInterpreterEngine {
     }
 
     this.isSpeaking = false;
-    this.muteUntilTime = Date.now() + 500;
+    this.muteUntilTime = Date.now() + 450;
     if (this.cb.onSpeakingChange) this.cb.onSpeakingChange(false);
   }
 
   async tryFastGeminiRestTts(text, cfg) {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 2400);
+    const timer = setTimeout(() => controller.abort(), 3200);
     try {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${encodeURIComponent(cfg.apiKey)}`;
       const res = await fetch(url, {
@@ -716,23 +757,31 @@ class GeminiInterpreterEngine {
       const targetLang = isKo ? "ko-KR" : pInfo.bcp47;
       utter.lang = targetLang;
 
-      const best = this.pickNeuralBrowserVoice(targetLang);
-      if (best) utter.voice = best;
+      const isAndroid = /Android/i.test(navigator.userAgent);
+      if (!isAndroid) {
+        const best = this.pickNeuralBrowserVoice(targetLang);
+        if (best) utter.voice = best;
+      }
 
       let rate = parseFloat(cfg.ttsRate) || 1.15;
-      if (this.speechQueue.length >= 1) rate = Math.min(1.42, rate + 0.15);
+      if (text.length > 45 || this.speechQueue.length >= 1) {
+        rate = Math.min(1.38, rate + 0.12);
+      }
       utter.rate = rate;
       utter.volume = 1.0;
 
+      // 긴 병합 문장도 도중에 잘리지 않도록 충분한 시간 보장
       const guard = setTimeout(() => {
         try { window.speechSynthesis.cancel(); } catch (e) {}
         resolve();
-      }, Math.max(4000, text.length * 200));
+      }, Math.max(9000, text.length * 350));
 
       utter.onend = () => { clearTimeout(guard); resolve(); };
       utter.onerror = () => { clearTimeout(guard); resolve(); };
       try {
-        window.speechSynthesis.resume();
+        if (!isAndroid && window.speechSynthesis.paused) {
+          window.speechSynthesis.resume();
+        }
         window.speechSynthesis.speak(utter);
       } catch (e) {
         clearTimeout(guard);
@@ -770,7 +819,7 @@ class GeminiInterpreterEngine {
 
   downsampleTo16k(buffer, inputRate) {
     if (inputRate === 16000) return buffer;
-    const ratio = inputRate / 16000;
+    const ratio = inputRate / targetRate16k();
     const outLen = Math.round(buffer.length / ratio);
     const out = new Float32Array(outLen);
     let offsetResult = 0, offsetBuffer = 0;
@@ -825,10 +874,15 @@ class GeminiInterpreterEngine {
     if (this.inputCtx) { this.inputCtx.close().catch(() => {}); this.inputCtx = null; }
     if (this.stream) { this.stream.getTracks().forEach((t) => t.stop()); this.stream = null; }
     this.pcmBuffer = [];
+    this.audioJobQueue = [];
     this.voiceSamples = 0;
     this.silenceSamples = 0;
     if (this.cb.onVolume) this.cb.onVolume(0);
   }
+}
+
+function targetRate16k() {
+  return 16000;
 }
 
 window.INTERPRETER_LANGS = INTERPRETER_LANGS;
