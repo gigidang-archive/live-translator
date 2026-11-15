@@ -72,6 +72,19 @@ document.addEventListener("DOMContentLoaded", () => {
   detectMicHardware();
   navigator.mediaDevices?.addEventListener?.("devicechange", detectMicHardware);
 
+  async function bindBluetoothOutputSink(audioCtx) {
+    if (!audioCtx || typeof audioCtx.setSinkId !== "function" || !navigator.mediaDevices?.enumerateDevices) {
+      return;
+    }
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const btOut = devices.find((d) => d.kind === "audiooutput" && /bluetooth|buds|airpods|headset|earphone|이어폰|버즈/i.test(d.label || ""));
+      if (btOut && btOut.deviceId) {
+        await audioCtx.setSinkId(btOut.deviceId);
+      }
+    } catch (e) {}
+  }
+
   const engine = new window.GeminiInterpreterEngine({
     getConfig: () => ({
       activeTier,
@@ -79,13 +92,13 @@ document.addEventListener("DOMContentLoaded", () => {
       backupPaidKey: el.paidApiKeyInput?.value.trim() || "",
       voiceName: el.voiceNameSelect?.value || "Kore",
       voiceModel: el.voiceModelSelect?.value || "fast_neural",
-      modelId: el.modelSelect?.value || "gemini-3.5-flash-lite",
+      modelId: el.modelSelect?.value || "gemini-3.8-flash",
       summaryModelId: el.summaryModelSelect?.value || "gemini-3.8-flash",
       partnerLang: el.partnerLangSelect?.value || "en",
       autoMode: el.autoModeSelect?.value || "to_ko_only",
       chunkMs: el.chunkIntervalSelect?.value || "2800",
       ttsRate: el.ttsRateSelect?.value || "1.15",
-      duplexMode: el.duplexModeSelect?.value || "smart_guard",
+      duplexMode: el.duplexModeSelect?.value || "full_duplex",
       tone: el.toneSelect?.value || "polite",
       glossary: el.glossaryInput?.value.trim() || ""
     }),
@@ -213,12 +226,12 @@ document.addEventListener("DOMContentLoaded", () => {
       el.micStateLabel.textContent = "텍스트 전용";
       return;
     }
-    if (speaking && el.duplexModeSelect?.value === "smart_guard" && el.autoModeSelect?.value === "auto_both") {
+    if (speaking && engine.driverMode === "mic" && el.duplexModeSelect?.value === "smart_guard" && el.autoModeSelect?.value === "auto_both") {
       el.volumeFill.classList.add("muted");
       el.micStateLabel.classList.add("muted");
       el.micStateLabel.textContent = "에코 방지 중";
     } else {
-      el.micStateLabel.textContent = engine.driverMode === "system_audio" ? "PC 소리 수신 중" : "마이크 수신 중";
+      el.micStateLabel.textContent = engine.driverMode === "system_audio" ? "PC 소리 수신 중" : "연속 수음 중";
     }
   }
 
@@ -230,15 +243,15 @@ document.addEventListener("DOMContentLoaded", () => {
     if (el.paidApiKeyInput?.value.trim()) activeTier = "paid";
 
     const map = [
-      ["gemini_rt_voice_name_v11", el.voiceNameSelect],
-      ["gemini_rt_voice_model_v11", el.voiceModelSelect],
-      ["gemini_rt_model_v11", el.modelSelect],
-      ["gemini_rt_sum_model_v11", el.summaryModelSelect],
+      ["gemini_rt_voice_name_v12", el.voiceNameSelect],
+      ["gemini_rt_voice_model_v12", el.voiceModelSelect],
+      ["gemini_rt_model_v12", el.modelSelect],
+      ["gemini_rt_sum_model_v12", el.summaryModelSelect],
       ["gemini_rt_partner_lang", el.partnerLangSelect],
-      ["gemini_rt_auto_mode_v11", el.autoModeSelect],
-      ["gemini_rt_chunk_len_v11", el.chunkIntervalSelect],
-      ["gemini_rt_tts_rate_v11", el.ttsRateSelect],
-      ["gemini_rt_duplex_mode_v11", el.duplexModeSelect],
+      ["gemini_rt_auto_mode_v12", el.autoModeSelect],
+      ["gemini_rt_chunk_len_v12", el.chunkIntervalSelect],
+      ["gemini_rt_tts_rate_v12", el.ttsRateSelect],
+      ["gemini_rt_duplex_mode_v12", el.duplexModeSelect],
       ["gemini_rt_tone", el.toneSelect],
       ["gemini_rt_glossary", el.glossaryInput]
     ];
@@ -253,22 +266,22 @@ document.addEventListener("DOMContentLoaded", () => {
     updateTierUI();
     syncQuickLangUI(el.partnerLangSelect?.value || "en");
     syncDirectionLockUI();
-    if (el.ch2StateText) el.ch2StateText.textContent = "v11 엔진 준비됨";
+    if (el.ch2StateText) el.ch2StateText.textContent = "블루투스 호환 엔진 준비됨";
   }
 
   function saveSettings() {
     if (el.freeApiKeyInput) localStorage.setItem("gemini_rt_free_key", el.freeApiKeyInput.value.trim());
     if (el.paidApiKeyInput) localStorage.setItem("gemini_rt_paid_key", el.paidApiKeyInput.value.trim());
     localStorage.setItem("gemini_rt_active_tier", activeTier);
-    if (el.voiceNameSelect) localStorage.setItem("gemini_rt_voice_name_v11", el.voiceNameSelect.value);
-    if (el.voiceModelSelect) localStorage.setItem("gemini_rt_voice_model_v11", el.voiceModelSelect.value);
-    if (el.modelSelect) localStorage.setItem("gemini_rt_model_v11", el.modelSelect.value);
-    if (el.summaryModelSelect) localStorage.setItem("gemini_rt_sum_model_v11", el.summaryModelSelect.value);
+    if (el.voiceNameSelect) localStorage.setItem("gemini_rt_voice_name_v12", el.voiceNameSelect.value);
+    if (el.voiceModelSelect) localStorage.setItem("gemini_rt_voice_model_v12", el.voiceModelSelect.value);
+    if (el.modelSelect) localStorage.setItem("gemini_rt_model_v12", el.modelSelect.value);
+    if (el.summaryModelSelect) localStorage.setItem("gemini_rt_sum_model_v12", el.summaryModelSelect.value);
     if (el.partnerLangSelect) localStorage.setItem("gemini_rt_partner_lang", el.partnerLangSelect.value);
-    if (el.autoModeSelect) localStorage.setItem("gemini_rt_auto_mode_v11", el.autoModeSelect.value);
-    if (el.chunkIntervalSelect) localStorage.setItem("gemini_rt_chunk_len_v11", el.chunkIntervalSelect.value);
-    if (el.ttsRateSelect) localStorage.setItem("gemini_rt_tts_rate_v11", el.ttsRateSelect.value);
-    if (el.duplexModeSelect) localStorage.setItem("gemini_rt_duplex_mode_v11", el.duplexModeSelect.value);
+    if (el.autoModeSelect) localStorage.setItem("gemini_rt_auto_mode_v12", el.autoModeSelect.value);
+    if (el.chunkIntervalSelect) localStorage.setItem("gemini_rt_chunk_len_v12", el.chunkIntervalSelect.value);
+    if (el.ttsRateSelect) localStorage.setItem("gemini_rt_tts_rate_v12", el.ttsRateSelect.value);
+    if (el.duplexModeSelect) localStorage.setItem("gemini_rt_duplex_mode_v12", el.duplexModeSelect.value);
     if (el.toneSelect) localStorage.setItem("gemini_rt_tone", el.toneSelect.value);
     if (el.glossaryInput) localStorage.setItem("gemini_rt_glossary", el.glossaryInput.value.trim());
   }
@@ -289,7 +302,7 @@ document.addEventListener("DOMContentLoaded", () => {
       el.headerTierBadge.classList.add("paid");
       el.keyStatusMsg.style.color = "#fbbf24";
       el.keyStatusMsg.textContent = el.paidApiKeyInput?.value.trim()
-        ? "유료 키 활성 (시간당 약 150~450원 저비용 모드)"
+        ? "유료 키 활성 (블루투스 미디어 모드 지원)"
         : "유료 키를 입력해 주세요.";
     }
   }
@@ -382,9 +395,12 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  el.soundTestBtn?.addEventListener("click", () => engine.testSound());
+  el.soundTestBtn?.addEventListener("click", async () => {
+    engine.unlockAudio(false);
+    await bindBluetoothOutputSink(engine.outputCtx);
+    engine.testSound();
+  });
 
-  // PC 시스템/탭 오디오 스트림 획득 공통 함수
   async function acquireSystemAudioStream() {
     if (!navigator.mediaDevices?.getDisplayMedia) {
       alert("PC 크롬 또는 엣지 브라우저에서 시스템 오디오 공유를 지원합니다.");
@@ -399,7 +415,7 @@ document.addEventListener("DOMContentLoaded", () => {
       disp.getVideoTracks().forEach((t) => t.stop());
       const aTracks = disp.getAudioTracks();
       if (aTracks.length === 0) {
-        alert("오디오가 공유되지 않았습니다!\n다시 버튼을 누른 뒤 공유 창 왼쪽 아래의 [탭 오디오도 공유] 또는 [시스템 오디오 공유] 스위치를 꼭 켜주세요.");
+        alert("공유 창 왼쪽 아래의 오디오 공유 스위치를 꼭 켜주세요.");
         return null;
       }
       if (el.duplexModeSelect) el.duplexModeSelect.value = "full_duplex";
@@ -417,6 +433,7 @@ document.addEventListener("DOMContentLoaded", () => {
     el.settingsPanel?.classList.add("hidden");
 
     await engine.startWithStream(stream, modeLabel);
+    await bindBluetoothOutputSink(engine.outputCtx);
 
     if (el.mainActionBtn) {
       el.mainActionBtn.textContent = "통역 중지";
@@ -458,18 +475,17 @@ document.addEventListener("DOMContentLoaded", () => {
     if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
     if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
     if (el.mainActionBtn) {
-      el.mainActionBtn.textContent = "통역 시작 (무마이크 시 PC소리 자동연결)";
+      el.mainActionBtn.textContent = "통역 시작";
       el.mainActionBtn.className = "btn-main btn-start";
     }
     if (el.ch1StateText) el.ch1StateText.textContent = "대기";
     if (!lastQuotaWarning) {
-      if (el.ch2StateText) el.ch2StateText.textContent = "v11 엔진 준비됨";
+      if (el.ch2StateText) el.ch2StateText.textContent = "블루투스 호환 엔진 준비됨";
       setStatus("대기", "");
     }
     updateMicVisual(false);
   }
 
-  // 파란색 메인 버튼 클릭 시: 마이크가 없으면 즉시 PC 시스템·탭 오디오 공유 창을 자동으로 띄움
   el.mainActionBtn?.addEventListener("click", async () => {
     if (engine.isRunning) {
       stopInterpreter();
@@ -484,11 +500,30 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    // 모바일 및 이어폰 모드에서는 통화용 스피커폰 전환(echoCancellation)을 끄고 미디어 오디오 경로를 유지함
+    const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
+    const keepMediaRoute = isMobile || el.duplexModeSelect?.value === "full_duplex" || el.autoModeSelect?.value !== "auto_both";
+
     try {
-      const micStream = await navigator.mediaDevices.getUserMedia({
-        audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true }
-      });
-      await beginEngineWithStream(micStream, "mic");
+      let BuiltInMicId = undefined;
+      if (isMobile && navigator.mediaDevices?.enumerateDevices) {
+        const devs = await navigator.mediaDevices.enumerateDevices();
+        const phoneMic = devs.find((d) => d.kind === "audioinput" && d.deviceId && !/bluetooth|buds|headset|earphone|블루투스/i.test(d.label || ""));
+        if (phoneMic && phoneMic.label) BuiltInMicId = phoneMic.deviceId;
+      }
+
+      const audioConstraints = {
+        channelCount: 1,
+        echoCancellation: !keepMediaRoute,
+        noiseSuppression: !keepMediaRoute,
+        autoGainControl: true
+      };
+      if (BuiltInMicId) {
+        audioConstraints.deviceId = { ideal: BuiltInMicId };
+      }
+
+      const micStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
+      await beginEngineWithStream(micStream, keepMediaRoute ? "bt_mic" : "mic");
     } catch (micErr) {
       hasMicHardware = false;
       const sysStream = await acquireSystemAudioStream();
