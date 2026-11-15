@@ -387,9 +387,6 @@
       text-align: center;
       transition: all 0.15s ease;
     }
-    .btn-summary-copy:active {
-      background-color: #3730a3;
-    }
     .btn-summary-copy.foreign {
       background-color: #064e3b;
       color: #d1fae5;
@@ -453,7 +450,7 @@
     .mic-state-label {
       font-size: 11px;
       color: #94a3b8;
-      min-width: 78px;
+      min-width: 84px;
       text-align: right;
       font-weight: 600;
     }
@@ -523,7 +520,7 @@
   <header>
     <div>
       <h1>AI 실시간 음성 동시통역</h1>
-      <div class="header-sub">무중단 자동갱신 · 이중언어 회의록 · 즉시공유</div>
+      <div class="header-sub">PC·모바일 오디오 안정화 · 무중단 갱신</div>
     </div>
     <div class="header-right">
       <span id="headerTierBadge" class="tier-badge">무료 키</span>
@@ -605,7 +602,7 @@
       <div class="field-group">
         <label for="echoGuardSelect">오디오 환경 및 에코 차단</label>
         <select id="echoGuardSelect">
-          <option value="speaker">스피커 모드 (음성 출력 중 마이크 자동 차단)</option>
+          <option value="speaker">스피커 모드 (문장 완료 시까지 에코 차단)</option>
           <option value="earphone">이어폰 모드 (동시 송수신 허용)</option>
         </select>
       </div>
@@ -662,8 +659,8 @@
 
   <main id="transcriptBox" class="transcript-container">
     <div class="bubble system">
-      통역 시작을 누르면 실시간 양방향 음성 통역과 대화 기록이 시작됩니다.<br />
-      이중언어 요약 버튼을 누르면 한국어 요약본과 상대방 언어 요약본이 생성되며, 카드 하단 버튼으로 각 언어 요약만 따로 복사할 수 있습니다.
+      PC와 모바일 환경 모두에서 음성이 끊기지 않도록 48kHz-16kHz 자동 리샘플링과 0.15초 지터 버퍼가 적용되었습니다.<br />
+      통역 시작을 누르고 말씀하시면 문장이 끝날 때까지 안정적으로 음성이 송출됩니다.
     </div>
   </main>
 
@@ -735,6 +732,7 @@
     let isConnecting = false;
     let isRenewing = false;
     let renewalPending = false;
+    let isAiTurnActive = false;
     let isAiSpeaking = false;
     let echoGuardTimer = null;
     let sessionInterval = null;
@@ -745,6 +743,7 @@
     let micStream = null;
     let inputAudioCtx = null;
     let processorNode = null;
+    let muteGainNode = null;
     let outputAudioCtx = null;
     let outputGainNode = null;
     let nextPlayTime = 0;
@@ -1018,7 +1017,7 @@
         sessionTimerBadge.textContent = formatDuration(totalElapsedSec);
 
         if (autoRenewSelect.value === "on" && sessionElapsedSec >= AUTO_RENEW_SECONDS && !isRenewing) {
-          if (!isAiSpeaking && activeSources.length === 0) {
+          if (!isAiTurnActive && !isAiSpeaking && activeSources.length === 0) {
             triggerSeamlessRenewal("12분 주기 자동 갱신");
           } else {
             renewalPending = true;
@@ -1173,7 +1172,6 @@
       };
     }
 
-    // 이중 언어 AI 회의록 요약 생성 기능 (한국어 + 선택한 상대방 언어 나란히 생성 및 개별 복사 버튼 제공)
     summarizeBtn.addEventListener("click", async () => {
       const dialogueText = collectDialogueOnlyText();
       if (!dialogueText) {
@@ -1247,7 +1245,6 @@
         const contentSpan = summaryBubble.querySelector(".bubble-content");
         contentSpan.textContent = summaryText;
 
-        // 카드 하단 개별 언어 요약 복사 버튼 영역 생성
         const actionRow = document.createElement("div");
         actionRow.className = "summary-card-actions";
 
@@ -1309,7 +1306,6 @@
       }
     });
 
-    // 모바일 Web Share API 원터치 공유 기능
     shareLogBtn.addEventListener("click", async () => {
       const text = collectFullExportText();
       if (!text) {
@@ -1338,7 +1334,7 @@
           if (err.name !== "AbortError") {
             try {
               await copyTextFallback(fullShareBody);
-              alert("앱 직접 공유가 제한되어 전체 내용을 클립보드에 대신 복사했습니다. 카카오톡이나 메일 앱에 바로 붙여넣으실 수 있습니다.");
+              alert("앱 직접 공유가 제한되어 전체 내용을 클립보드에 대신 복사했습니다.");
             } catch (copyErr) {
               alert("공유 중 오류가 발생했습니다: " + err.message);
             }
@@ -1347,7 +1343,7 @@
       } else {
         try {
           await copyTextFallback(fullShareBody);
-          alert("현재 브라우저는 모바일 공유 창을 지원하지 않아 전체 내용을 클립보드에 복사했습니다. 메신저나 메일 창에 바로 붙여넣으세요.");
+          alert("PC 브라우저에서는 전체 내용을 클립보드에 복사했습니다. 메신저나 메일 창에 바로 붙여넣으세요.");
         } catch (err) {
           alert("복사 오류: " + err.message);
         }
@@ -1421,20 +1417,22 @@
       }
     });
 
+    // PC 및 안드로이드 모든 사운드 드라이버와 호환되도록 기본 샘플레이트로 오디오 컨텍스트 생성
     function unlockAudioPlayback() {
       try {
         if (!outputAudioCtx || outputAudioCtx.state === "closed") {
-          outputAudioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+          outputAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
         }
         if (outputAudioCtx.state === "suspended") {
           outputAudioCtx.resume();
         }
         if (!outputGainNode) {
           outputGainNode = outputAudioCtx.createGain();
-          outputGainNode.gain.value = 1.35;
+          outputGainNode.gain.value = 1.4;
           outputGainNode.connect(outputAudioCtx.destination);
         }
-        const silentBuf = outputAudioCtx.createBuffer(1, 1, 24000);
+        const sr = outputAudioCtx.sampleRate || 48000;
+        const silentBuf = outputAudioCtx.createBuffer(1, 1, sr);
         const silentSrc = outputAudioCtx.createBufferSource();
         silentSrc.buffer = silentBuf;
         silentSrc.connect(outputGainNode);
@@ -1648,7 +1646,6 @@
         micStream = await navigator.mediaDevices.getUserMedia({
           audio: {
             channelCount: 1,
-            sampleRate: 16000,
             echoCancellation: true,
             noiseSuppression: true,
             autoGainControl: true
@@ -1667,7 +1664,7 @@
         isConnecting = false;
         mainActionBtn.disabled = false;
         setStatus("마이크 오류", "error");
-        alert("마이크 권한 허용이 필요합니다.\n오류 내용: " + err.message);
+        alert("마이크 장치를 찾을 수 없거나 권한이 거부되었습니다.\nPC의 경우 마이크가 연결되어 있는지 확인해 주세요.\n오류 내용: " + err.message);
       }
     }
 
@@ -1743,7 +1740,7 @@
 
         if (data.goAway) {
           if (!isRenewing) {
-            if (!isAiSpeaking && activeSources.length === 0) {
+            if (!isAiTurnActive && !isAiSpeaking && activeSources.length === 0) {
               triggerSeamlessRenewal("서버 사전 예고 자동 갱신");
             } else {
               renewalPending = true;
@@ -1794,6 +1791,10 @@
       if (!serverContent) return;
 
       if (serverContent.interrupted) {
+        // 스피커 모드에서 AI가 한 문장을 출력하는 도중에는 잔향으로 인한 자체 중단 신호를 무시하여 문장 잘림 방지
+        if (echoGuardSelect.value === "speaker" && (isAiTurnActive || isAiSpeaking)) {
+          return;
+        }
         stopAllPlayingAudio();
         currentTranslatedBubble = null;
         return;
@@ -1810,6 +1811,7 @@
 
       if (serverContent.modelTurn && serverContent.modelTurn.parts) {
         currentUserBubble = null;
+        isAiTurnActive = true;
         for (const part of serverContent.modelTurn.parts) {
           if (part.text) {
             appendTranslatedText(part.text);
@@ -1823,41 +1825,75 @@
       }
 
       if (serverContent.turnComplete) {
+        isAiTurnActive = false;
         currentTranslatedBubble = null;
         currentUserBubble = null;
-        if (renewalPending && activeSources.length === 0 && !isAiSpeaking) {
-          triggerSeamlessRenewal("대화 턴 완료 후 자동 갱신");
-        }
+        scheduleMicReopenAfterPlayback();
       }
+    }
+
+    // PC(48kHz) 및 모바일 기기의 네이티브 샘플레이트 오디오를 Gemini 표준 16kHz로 정밀 다운샘플링
+    function downsampleTo16k(float32Buffer, inputRate) {
+      const targetRate = 16000;
+      if (inputRate === targetRate) {
+        return float32Buffer;
+      }
+      const ratio = inputRate / targetRate;
+      const newLength = Math.round(float32Buffer.length / ratio);
+      const result = new Float32Array(newLength);
+      let offsetResult = 0;
+      let offsetBuffer = 0;
+      while (offsetResult < result.length) {
+        const nextOffsetBuffer = Math.round((offsetResult + 1) * ratio);
+        let accum = 0;
+        let count = 0;
+        for (let i = offsetBuffer; i < nextOffsetBuffer && i < float32Buffer.length; i++) {
+          accum += float32Buffer[i];
+          count++;
+        }
+        result[offsetResult] = count > 0 ? accum / count : 0;
+        offsetResult++;
+        offsetBuffer = nextOffsetBuffer;
+      }
+      return result;
     }
 
     function startMicCapture() {
       if (inputAudioCtx) return;
-      inputAudioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+      inputAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (inputAudioCtx.state === "suspended") {
+        inputAudioCtx.resume();
+      }
+      const nativeSampleRate = inputAudioCtx.sampleRate || 48000;
       const source = inputAudioCtx.createMediaStreamSource(micStream);
       processorNode = inputAudioCtx.createScriptProcessor(4096, 1, 1);
+
+      // PC 크롬에서 로컬 마이크 루프백 하울링 방지용 0게인 노드 연결
+      muteGainNode = inputAudioCtx.createGain();
+      muteGainNode.gain.value = 0;
 
       processorNode.onaudioprocess = (e) => {
         if (!isRunning || isRenewing || !ws || ws.readyState !== WebSocket.OPEN) return;
 
-        const blockEcho = echoGuardSelect.value === "speaker" && isAiSpeaking;
+        const blockEcho = echoGuardSelect.value === "speaker" && (isAiTurnActive || isAiSpeaking);
         if (blockEcho) {
           return;
         }
 
-        const float32Data = e.inputBuffer.getChannelData(0);
+        const rawFloat32 = e.inputBuffer.getChannelData(0);
+        const downsampled16k = downsampleTo16k(rawFloat32, nativeSampleRate);
 
         let sum = 0;
-        for (let i = 0; i < float32Data.length; i++) {
-          sum += float32Data[i] * float32Data[i];
+        for (let i = 0; i < downsampled16k.length; i++) {
+          sum += downsampled16k[i] * downsampled16k[i];
         }
-        const rms = Math.sqrt(sum / float32Data.length);
+        const rms = Math.sqrt(sum / downsampled16k.length);
         const level = Math.min(100, Math.round(rms * 450));
         volumeFill.style.width = level + "%";
 
-        const int16Buffer = new Int16Array(float32Data.length);
-        for (let i = 0; i < float32Data.length; i++) {
-          const s = Math.max(-1, Math.min(1, float32Data[i]));
+        const int16Buffer = new Int16Array(downsampled16k.length);
+        for (let i = 0; i < downsampled16k.length; i++) {
+          const s = Math.max(-1, Math.min(1, downsampled16k[i]));
           int16Buffer[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
         }
         const base64Audio = arrayBufferToBase64(int16Buffer.buffer);
@@ -1873,7 +1909,29 @@
       };
 
       source.connect(processorNode);
-      processorNode.connect(inputAudioCtx.destination);
+      processorNode.connect(muteGainNode);
+      muteGainNode.connect(inputAudioCtx.destination);
+    }
+
+    function scheduleMicReopenAfterPlayback() {
+      if (isAiTurnActive || activeSources.length > 0) {
+        return;
+      }
+      if (echoGuardTimer) {
+        clearTimeout(echoGuardTimer);
+      }
+      echoGuardTimer = setTimeout(() => {
+        if (isAiTurnActive || activeSources.length > 0) return;
+        isAiSpeaking = false;
+        echoGuardTimer = null;
+        if (isRunning) {
+          setMicGateVisual(false);
+          setStatus("실시간 통역 중", "connected");
+          if (renewalPending) {
+            triggerSeamlessRenewal("12분 주기 자동 갱신");
+          }
+        }
+      }, 550);
     }
 
     function playPcmChunk(base64Data) {
@@ -1910,25 +1968,19 @@
       source.buffer = audioBuffer;
       source.connect(outputGainNode || outputAudioCtx.destination);
 
-      const startTime = Math.max(outputAudioCtx.currentTime, nextPlayTime);
-      source.start(startTime);
-      nextPlayTime = startTime + audioBuffer.duration;
+      // 네트워크 지터로 인한 조각 간 끊김을 방지하기 위해 0.15초 선행 지터 버퍼 적용
+      const now = outputAudioCtx.currentTime;
+      if (nextPlayTime < now) {
+        nextPlayTime = now + 0.15;
+      }
+      source.start(nextPlayTime);
+      nextPlayTime += audioBuffer.duration;
 
       activeSources.push(source);
       source.onended = () => {
         activeSources = activeSources.filter(s => s !== source);
-        if (activeSources.length === 0) {
-          echoGuardTimer = setTimeout(() => {
-            isAiSpeaking = false;
-            echoGuardTimer = null;
-            if (isRunning) {
-              setMicGateVisual(false);
-              setStatus("실시간 통역 중", "connected");
-              if (renewalPending) {
-                triggerSeamlessRenewal("12분 주기 자동 갱신");
-              }
-            }
-          }, 450);
+        if (activeSources.length === 0 && !isAiTurnActive) {
+          scheduleMicReopenAfterPlayback();
         }
       };
     }
@@ -1942,6 +1994,7 @@
         try { src.stop(); } catch (e) {}
       }
       activeSources = [];
+      isAiTurnActive = false;
       isAiSpeaking = false;
       if (outputAudioCtx) {
         nextPlayTime = outputAudioCtx.currentTime;
@@ -1957,6 +2010,7 @@
       isConnecting = false;
       isRenewing = false;
       renewalPending = false;
+      isAiTurnActive = false;
       stopSessionTimer();
       releaseWakeLock();
       stopAllPlayingAudio();
@@ -1965,6 +2019,10 @@
       if (processorNode) {
         processorNode.disconnect();
         processorNode = null;
+      }
+      if (muteGainNode) {
+        muteGainNode.disconnect();
+        muteGainNode = null;
       }
       if (inputAudioCtx) {
         inputAudioCtx.close().catch(() => {});
