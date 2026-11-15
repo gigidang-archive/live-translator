@@ -75,8 +75,8 @@
       color: #6ee7b7;
     }
     .status-badge.speaking {
-      background-color: #0369a1;
-      color: #e0f2fe;
+      background-color: #9a3412;
+      color: #fed7aa;
     }
     .status-badge.error {
       background-color: #7f1d1d;
@@ -348,9 +348,14 @@
       flex-direction: column;
       gap: 9px;
     }
+    .mic-gate-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
     .visualizer-bar {
-      width: 100%;
-      height: 5px;
+      flex: 1;
+      height: 6px;
       background-color: #0f172a;
       border-radius: 3px;
       overflow: hidden;
@@ -359,7 +364,21 @@
       height: 100%;
       width: 0%;
       background-color: #38bdf8;
-      transition: width 0.08s linear;
+      transition: width 0.08s linear, background-color 0.15s;
+    }
+    .visualizer-fill.muted {
+      width: 100% !important;
+      background-color: #f97316;
+    }
+    .mic-state-label {
+      font-size: 11px;
+      color: #94a3b8;
+      min-width: 78px;
+      text-align: right;
+      font-weight: 600;
+    }
+    .mic-state-label.muted {
+      color: #fb923c;
     }
     .mode-status-bar {
       width: 100%;
@@ -500,12 +519,21 @@
     </div>
     <div class="row-2">
       <div class="field-group">
+        <label for="echoGuardSelect">오디오 환경 및 에코 차단</label>
+        <select id="echoGuardSelect">
+          <option value="speaker">스피커 모드 (음성 출력 중 마이크 자동 차단)</option>
+          <option value="earphone">이어폰 모드 (동시 송수신 허용)</option>
+        </select>
+      </div>
+      <div class="field-group">
         <label for="voiceOutputSelect">음성 출력 설정</label>
         <select id="voiceOutputSelect">
           <option value="on">즉시 음성 출력 + 화면 문자 기록</option>
           <option value="off">무음 모드 (화면 문자만 기록)</option>
         </select>
       </div>
+    </div>
+    <div class="row-2">
       <div class="field-group">
         <label for="toneSelect">통역 어투</label>
         <select id="toneSelect">
@@ -513,17 +541,6 @@
           <option value="casual">구어체/친근한 대화</option>
           <option value="formal">격식체 (비즈니스/학술)</option>
         </select>
-      </div>
-    </div>
-    <div class="row-2">
-      <div class="field-group">
-        <label for="modelInput">실시간 음성 모델 ID</label>
-        <input type="text" id="modelInput" list="liveModelList" value="gemini-2.0-flash-exp" />
-        <datalist id="liveModelList">
-          <option value="gemini-2.0-flash-exp"></option>
-          <option value="gemini-2.0-flash-live-001"></option>
-          <option value="gemini-2.5-flash-native-audio-preview-09-2025"></option>
-        </datalist>
       </div>
       <div class="field-group">
         <label for="voiceNameSelect">AI 통역사 목소리</label>
@@ -536,6 +553,15 @@
       </div>
     </div>
     <div class="field-group">
+      <label for="modelInput">실시간 음성 모델 ID</label>
+      <input type="text" id="modelInput" list="liveModelList" value="gemini-2.0-flash-exp" />
+      <datalist id="liveModelList">
+        <option value="gemini-2.0-flash-exp"></option>
+        <option value="gemini-2.0-flash-live-001"></option>
+        <option value="gemini-2.5-flash-native-audio-preview-09-2025"></option>
+      </datalist>
+    </div>
+    <div class="field-group">
       <label for="glossaryInput">상황 및 전문 용어집 (선택 입력)</label>
       <textarea id="glossaryInput" placeholder="예: 학술 세미나 또는 해외 거래처 미팅. 고유명사와 전문 용어를 적어두면 음성 통역에 즉시 반영됩니다."></textarea>
     </div>
@@ -543,17 +569,20 @@
 
   <main id="transcriptBox" class="transcript-container">
     <div class="bubble system">
-      통역 시작을 누르면 중간에 별도 버튼을 누르지 않아도<br />
-      상대방 말은 즉시 한국어 음성으로, 내 한국어는 상대 언어로 바로 음성 통역되며 화면에 문자로 기록됩니다.
+      통역 시작을 누르면 스피커에서 AI 통역 음성이 나오는 동안 마이크가 자동으로 일시 정지되어 에코 루프를 차단합니다.<br />
+      말씀하시면 즉시 음성으로 통역되고 화면에는 대화 원문과 통역 문자가 기록됩니다.
     </div>
   </main>
 
   <footer class="controls">
-    <div class="visualizer-bar">
-      <div id="volumeFill" class="visualizer-fill"></div>
+    <div class="mic-gate-row">
+      <div class="visualizer-bar">
+        <div id="volumeFill" class="visualizer-fill"></div>
+      </div>
+      <span id="micStateLabel" class="mic-state-label">마이크 대기</span>
     </div>
     <div id="modeStatusBar" class="mode-status-bar" title="탭하면 자동/수동 고정 모드를 바꿀 수 있습니다">
-      <span id="modeStatusText">자동 양방향: 한국어 ↔ 영어 즉시 음성통역</span>
+      <span id="modeStatusText">완전 자동 양방향: 한국어 ↔ 영어 즉시 음성통역</span>
       <span class="mode-pill">자동 감지</span>
     </div>
     <div class="btn-row">
@@ -574,6 +603,7 @@
 
     const partnerLangSelect = document.getElementById("partnerLangSelect");
     const autoModeSelect = document.getElementById("autoModeSelect");
+    const echoGuardSelect = document.getElementById("echoGuardSelect");
     const voiceOutputSelect = document.getElementById("voiceOutputSelect");
     const toneSelect = document.getElementById("toneSelect");
     const modelInput = document.getElementById("modelInput");
@@ -591,6 +621,7 @@
     const mainActionBtn = document.getElementById("mainActionBtn");
     const clearBtn = document.getElementById("clearBtn");
     const volumeFill = document.getElementById("volumeFill");
+    const micStateLabel = document.getElementById("micStateLabel");
 
     const LANG_NAMES = {
       en: { ko: "영어", en: "English" },
@@ -603,6 +634,8 @@
     let ws = null;
     let isRunning = false;
     let isConnecting = false;
+    let isAiSpeaking = false;
+    let echoGuardTimer = null;
     let micStream = null;
     let inputAudioCtx = null;
     let processorNode = null;
@@ -622,6 +655,7 @@
 
       const savedPartner = localStorage.getItem("gemini_rt_partner_lang");
       const savedAutoMode = localStorage.getItem("gemini_rt_auto_mode");
+      const savedEchoGuard = localStorage.getItem("gemini_rt_echo_guard");
       const savedVoiceOut = localStorage.getItem("gemini_rt_voice_out");
       const savedTone = localStorage.getItem("gemini_rt_tone");
       const savedModel = localStorage.getItem("gemini_rt_model");
@@ -637,6 +671,7 @@
       }
       if (savedPartner) partnerLangSelect.value = savedPartner;
       if (savedAutoMode) autoModeSelect.value = savedAutoMode;
+      if (savedEchoGuard) echoGuardSelect.value = savedEchoGuard;
       if (savedVoiceOut) voiceOutputSelect.value = savedVoiceOut;
       if (savedTone) toneSelect.value = savedTone;
       if (savedModel) modelInput.value = savedModel;
@@ -654,6 +689,7 @@
       localStorage.setItem("gemini_rt_active_tier", activeKeyTier);
       localStorage.setItem("gemini_rt_partner_lang", partnerLangSelect.value);
       localStorage.setItem("gemini_rt_auto_mode", autoModeSelect.value);
+      localStorage.setItem("gemini_rt_echo_guard", echoGuardSelect.value);
       localStorage.setItem("gemini_rt_voice_out", voiceOutputSelect.value);
       localStorage.setItem("gemini_rt_tone", toneSelect.value);
       localStorage.setItem("gemini_rt_model", modelInput.value.trim());
@@ -815,6 +851,7 @@
     });
 
     partnerLangSelect.addEventListener("change", () => selectPartnerLanguage(partnerLangSelect.value));
+    echoGuardSelect.addEventListener("change", () => saveSettings());
 
     autoModeSelect.addEventListener("change", () => {
       saveSettings();
@@ -850,6 +887,25 @@
       } else {
         modeStatusText.textContent = `말하기 고정: 한국어 → ${partnerKoName} 음성통역`;
         pill.textContent = "말하기 고정";
+      }
+    }
+
+    function setMicGateVisual(muted) {
+      if (!isRunning) {
+        volumeFill.classList.remove("muted");
+        volumeFill.style.width = "0%";
+        micStateLabel.classList.remove("muted");
+        micStateLabel.textContent = "마이크 대기";
+        return;
+      }
+      if (muted) {
+        volumeFill.classList.add("muted");
+        micStateLabel.classList.add("muted");
+        micStateLabel.textContent = "에코 차단 중";
+      } else {
+        volumeFill.classList.remove("muted");
+        micStateLabel.classList.remove("muted");
+        micStateLabel.textContent = "음성 수신 중";
       }
     }
 
@@ -951,7 +1007,6 @@
       if (isRunning || isConnecting) {
         stopSession();
       } else {
-        // 사용자 클릭 이벤트 내부에서 동기적으로 오디오 출력을 즉시 잠금 해제
         unlockAudioPlayback();
         startSession();
       }
@@ -967,10 +1022,9 @@
         }
         if (!outputGainNode) {
           outputGainNode = outputAudioCtx.createGain();
-          outputGainNode.gain.value = 1.35; // 스피커 음성 출력 명료도 증폭
+          outputGainNode.gain.value = 1.35;
           outputGainNode.connect(outputAudioCtx.destination);
         }
-        // 무음 버퍼 1프레임 즉시 재생으로 모바일 크롬 오디오 정책 해제
         const silentBuf = outputAudioCtx.createBuffer(1, 1, 24000);
         const silentSrc = outputAudioCtx.createBufferSource();
         silentSrc.buffer = silentBuf;
@@ -1231,13 +1285,15 @@
 
           isConnecting = false;
           isRunning = true;
+          isAiSpeaking = false;
+          setMicGateVisual(false);
           mainActionBtn.disabled = false;
           mainActionBtn.textContent = "통역 중지";
           mainActionBtn.className = "btn-main btn-stop";
           setStatus("실시간 통역 중", "connected");
 
           const partnerKoName = LANG_NAMES[partnerLangSelect.value].ko;
-          addSystemMessage(`[${tierLabel}] 연결 완료. 지금부터 한국어 또는 ${partnerKoName}로 말씀하시면 즉시 음성 통역됩니다.`);
+          addSystemMessage(`[${tierLabel}] 연결 완료. 한국어 또는 ${partnerKoName}로 말씀하시면 즉시 음성 통역됩니다.`);
         };
 
         ws.onmessage = async (event) => {
@@ -1326,6 +1382,12 @@
       processorNode.onaudioprocess = (e) => {
         if (!isRunning || !ws || ws.readyState !== WebSocket.OPEN) return;
 
+        // 스피커 모드에서 AI 음성이 재생 중이면 마이크 데이터 전송을 즉시 차단해 에코 루프 방지
+        const blockEcho = echoGuardSelect.value === "speaker" && isAiSpeaking;
+        if (blockEcho) {
+          return;
+        }
+
         const float32Data = e.inputBuffer.getChannelData(0);
 
         let sum = 0;
@@ -1363,6 +1425,19 @@
         outputAudioCtx.resume();
       }
 
+      if (echoGuardTimer) {
+        clearTimeout(echoGuardTimer);
+        echoGuardTimer = null;
+      }
+
+      isAiSpeaking = true;
+      if (echoGuardSelect.value === "speaker") {
+        setMicGateVisual(true);
+        setStatus("음성 송출 중 (에코 차단)", "speaking");
+      } else {
+        setStatus("통역 음성 출력 중", "speaking");
+      }
+
       const arrayBuffer = base64ToArrayBuffer(base64Data);
       const int16Array = new Int16Array(arrayBuffer);
       const float32Array = new Float32Array(int16Array.length);
@@ -1382,25 +1457,38 @@
       source.start(startTime);
       nextPlayTime = startTime + audioBuffer.duration;
 
-      setStatus("통역 음성 출력 중", "speaking");
       activeSources.push(source);
       source.onended = () => {
         activeSources = activeSources.filter(s => s !== source);
-        if (activeSources.length === 0 && isRunning) {
-          setStatus("실시간 통역 중", "connected");
+        if (activeSources.length === 0) {
+          // 마지막 음성 조각 재생 완료 후 실내 잔향 흡수를 위해 0.45초 뒤 마이크 재개
+          echoGuardTimer = setTimeout(() => {
+            isAiSpeaking = false;
+            echoGuardTimer = null;
+            if (isRunning) {
+              setMicGateVisual(false);
+              setStatus("실시간 통역 중", "connected");
+            }
+          }, 450);
         }
       };
     }
 
     function stopAllPlayingAudio() {
+      if (echoGuardTimer) {
+        clearTimeout(echoGuardTimer);
+        echoGuardTimer = null;
+      }
       for (const src of activeSources) {
         try { src.stop(); } catch (e) {}
       }
       activeSources = [];
+      isAiSpeaking = false;
       if (outputAudioCtx) {
         nextPlayTime = outputAudioCtx.currentTime;
       }
       if (isRunning) {
+        setMicGateVisual(false);
         setStatus("실시간 통역 중", "connected");
       }
     }
@@ -1410,6 +1498,7 @@
       isConnecting = false;
       releaseWakeLock();
       stopAllPlayingAudio();
+      setMicGateVisual(false);
 
       if (processorNode) {
         processorNode.disconnect();
@@ -1424,7 +1513,6 @@
         micStream = null;
       }
 
-      volumeFill.style.width = "0%";
       mainActionBtn.disabled = false;
       mainActionBtn.textContent = "통역 시작";
       mainActionBtn.className = "btn-main btn-start";
