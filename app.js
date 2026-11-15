@@ -11,6 +11,8 @@ document.addEventListener("DOMContentLoaded", () => {
     freeKeyFileInput: document.getElementById("freeKeyFileInput"),
     paidKeyFileInput: document.getElementById("paidKeyFileInput"),
     keyStatusMsg: document.getElementById("keyStatusMsg"),
+    voiceNameSelect: document.getElementById("voiceNameSelect"),
+    voiceModelSelect: document.getElementById("voiceModelSelect"),
     modelSelect: document.getElementById("modelSelect"),
     summaryModelSelect: document.getElementById("summaryModelSelect"),
     partnerLangSelect: document.getElementById("partnerLangSelect"),
@@ -25,6 +27,7 @@ document.addEventListener("DOMContentLoaded", () => {
     btnLockToKo: document.getElementById("btnLockToKo"),
     btnLockFromKo: document.getElementById("btnLockFromKo"),
     sessionTimerBadge: document.getElementById("sessionTimerBadge"),
+    costBadge: document.getElementById("costBadge"),
     soundTestBtn: document.getElementById("soundTestBtn"),
     summarizeBtn: document.getElementById("summarizeBtn"),
     shareLogBtn: document.getElementById("shareLogBtn"),
@@ -46,106 +49,97 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   let activeTier = "free";
+  let hasMicHardware = true;
+  let lastQuotaWarning = "";
   let committedOrigHistory = "";
-  let livePreviewCard = null;
   let cardMap = new Map();
   let timerInterval = null;
   let elapsedSec = 1;
   let wakeLock = null;
 
-  function renderOriginalMonitor(liveTypingText) {
-    el.liveOriginalStream.innerHTML = "";
-    if (committedOrigHistory) {
-      const histSpan = document.createElement("span");
-      histSpan.textContent = committedOrigHistory + (liveTypingText ? " " : "");
-      el.liveOriginalStream.appendChild(histSpan);
-    }
-    if (liveTypingText) {
-      const activeSpan = document.createElement("span");
-      activeSpan.className = "live-active-span";
-      activeSpan.textContent = liveTypingText;
-      el.liveOriginalStream.appendChild(activeSpan);
-    }
-    el.liveOriginalStream.scrollTop = el.liveOriginalStream.scrollHeight;
-  }
-
-  function updateLivePreviewBubble(liveTypingText) {
-    if (!liveTypingText) {
-      if (livePreviewCard && livePreviewCard.parentNode) {
-        livePreviewCard.parentNode.removeChild(livePreviewCard);
-      }
-      livePreviewCard = null;
+  async function detectMicHardware() {
+    if (!navigator.mediaDevices?.enumerateDevices) {
+      hasMicHardware = false;
       return;
     }
-    if (!livePreviewCard) {
-      livePreviewCard = document.createElement("div");
-      livePreviewCard.className = "bubble live-typing";
-      livePreviewCard.innerHTML = `<div class="bubble-header"><span class="bubble-label">실시간 음성 받아쓰기 중...</span></div><div class="live-typing-body"></div>`;
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      hasMicHardware = devices.some((d) => d.kind === "audioinput");
+    } catch (e) {
+      hasMicHardware = false;
     }
-    livePreviewCard.querySelector(".live-typing-body").textContent = liveTypingText;
-    el.transcriptBox.appendChild(livePreviewCard);
-    el.transcriptBox.scrollTop = el.transcriptBox.scrollHeight;
   }
+  detectMicHardware();
+  navigator.mediaDevices?.addEventListener?.("devicechange", detectMicHardware);
 
   const engine = new window.GeminiInterpreterEngine({
     getConfig: () => ({
-      apiKey: activeTier === "paid" ? el.paidApiKeyInput.value.trim() : el.freeApiKeyInput.value.trim(),
-      modelId: el.modelSelect.value,
-      summaryModelId: el.summaryModelSelect.value,
-      partnerLang: el.partnerLangSelect.value,
-      autoMode: el.autoModeSelect.value,
-      chunkLen: el.chunkIntervalSelect.value,
-      chunkMs: el.chunkIntervalSelect.value,
-      ttsRate: el.ttsRateSelect.value,
-      duplexMode: el.duplexModeSelect.value,
-      tone: el.toneSelect.value,
-      glossary: el.glossaryInput.value.trim()
+      activeTier,
+      apiKey: activeTier === "paid" ? (el.paidApiKeyInput?.value.trim() || "") : (el.freeApiKeyInput?.value.trim() || ""),
+      backupPaidKey: el.paidApiKeyInput?.value.trim() || "",
+      voiceName: el.voiceNameSelect?.value || "Kore",
+      voiceModel: el.voiceModelSelect?.value || "fast_neural",
+      modelId: el.modelSelect?.value || "gemini-3.5-flash-lite",
+      summaryModelId: el.summaryModelSelect?.value || "gemini-3.8-flash",
+      partnerLang: el.partnerLangSelect?.value || "en",
+      autoMode: el.autoModeSelect?.value || "to_ko_only",
+      chunkMs: el.chunkIntervalSelect?.value || "2800",
+      ttsRate: el.ttsRateSelect?.value || "1.15",
+      duplexMode: el.duplexModeSelect?.value || "smart_guard",
+      tone: el.toneSelect?.value || "polite",
+      glossary: el.glossaryInput?.value.trim() || ""
     }),
     onVolume: (level) => {
-      el.volumeFill.style.width = level + "%";
+      if (el.volumeFill) el.volumeFill.style.width = level + "%";
+    },
+    onCostUpdate: (calls, krw) => {
+      if (el.costBadge) {
+        el.costBadge.textContent = activeTier === "paid" ? `${calls}회 · 약 ${krw}원` : `${calls}회 · 무료키`;
+      }
     },
     onChannelState: (s1, s2) => {
-      if (s1) el.ch1StateText.textContent = s1;
-      if (s2) el.ch2StateText.textContent = s2;
-    },
-    onLiveTyping: (liveText) => {
-      renderOriginalMonitor(liveText);
-      updateLivePreviewBubble(liveText);
-    },
-    onOrigClauseLocked: (seq, origText) => {
-      committedOrigHistory = committedOrigHistory ? (committedOrigHistory + " " + origText) : origText;
-      renderOriginalMonitor(engine.lastLiveUnconsumed || "");
-      createOrUpdateChunkCard(seq, origText, "통역 생성 중...");
+      if (s1 && el.ch1StateText) el.ch1StateText.textContent = s1;
+      if (s2 && el.ch2StateText && !lastQuotaWarning) el.ch2StateText.textContent = s2;
     },
     onSpeakingChange: (speaking) => {
       if (speaking) {
-        el.ch2StateText.textContent = "음성 송출 중";
+        lastQuotaWarning = "";
+        if (el.ch2StateText) el.ch2StateText.textContent = "음성 송출 중";
         setStatus("음성 송출 중", "speaking");
       } else {
-        el.ch2StateText.textContent = "대기";
-        if (engine.isRunning) setStatus("동시통역 중", "connected");
+        if (el.ch2StateText && !lastQuotaWarning) el.ch2StateText.textContent = "대기";
+        if (engine.isRunning && !lastQuotaWarning) setStatus("동시통역 중", "connected");
       }
       updateMicVisual(speaking);
     },
-    onChunkCommitted: (seq, orig, trans, preLockedOrig) => {
-      if (!preLockedOrig && orig) {
+    onChunkCommitted: (seq, orig, trans) => {
+      lastQuotaWarning = "";
+      if (orig && el.liveOriginalStream) {
         committedOrigHistory = committedOrigHistory ? (committedOrigHistory + " " + orig) : orig;
-        renderOriginalMonitor("");
+        el.liveOriginalStream.textContent = committedOrigHistory;
+        el.liveOriginalStream.scrollTop = el.liveOriginalStream.scrollHeight;
       }
-      if (trans) {
+      if (trans && el.liveTranslatedStream) {
         el.liveTranslatedStream.textContent += (el.liveTranslatedStream.textContent ? " " : "") + trans;
         el.liveTranslatedStream.scrollTop = el.liveTranslatedStream.scrollHeight;
       }
       createOrUpdateChunkCard(seq, orig, trans || "(통역 생략)");
       if (engine.isRunning && !engine.isSpeaking) setStatus("동시통역 중", "connected");
     },
+    onAutoSwitchPaid: () => {
+      activeTier = "paid";
+      saveSettings();
+      updateTierUI();
+      if (el.ch2StateText) el.ch2StateText.textContent = "무료 한도 초과 → 유료 키 전환됨";
+    },
     onNoMicFallback: () => {
       updateMicVisual(false);
-      el.ch1StateText.textContent = "마이크 없음 (텍스트/탭소리)";
+      if (el.ch1StateText) el.ch1StateText.textContent = "텍스트 전용 대기";
     },
-    onError: (msg) => {
-      setStatus("오류 확인", "error");
-      el.ch2StateText.textContent = msg.slice(0, 32);
+    onError: (msg, isQuota429) => {
+      setStatus(isQuota429 ? "한도 초과(429)" : "오류 확인", "error");
+      if (isQuota429) lastQuotaWarning = msg;
+      if (el.ch2StateText) el.ch2StateText.textContent = msg;
     }
   });
 
@@ -156,27 +150,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function getFileTimestamp() {
     const d = new Date();
-    const yyyy = d.getFullYear();
-    const mo = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-    const hh = String(d.getHours()).padStart(2, "0");
-    const mm = String(d.getMinutes()).padStart(2, "0");
-    const ss = String(d.getSeconds()).padStart(2, "0");
-    return `${yyyy}${mo}${dd}_${hh}${mm}${ss}`;
+    return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}_${String(d.getHours()).padStart(2, "0")}${String(d.getMinutes()).padStart(2, "0")}${String(d.getSeconds()).padStart(2, "0")}`;
   }
 
   function createOrUpdateChunkCard(seq, orig, trans) {
+    if (!el.transcriptBox) return;
     let card = cardMap.get(seq);
     if (!card) {
       card = document.createElement("div");
       card.className = "bubble chunk-pair";
       card.innerHTML = `<div class="bubble-header"><span class="bubble-label">#${seq}</span><span class="bubble-time">${nowTimeStr()}</span></div><div class="chunk-orig-line"></div><div class="chunk-trans-line"></div>`;
       cardMap.set(seq, card);
-      if (livePreviewCard && livePreviewCard.parentNode === el.transcriptBox) {
-        el.transcriptBox.insertBefore(card, livePreviewCard);
-      } else {
-        el.transcriptBox.appendChild(card);
-      }
+      el.transcriptBox.appendChild(card);
     }
     if (orig) card.querySelector(".chunk-orig-line").textContent = orig;
     if (trans) card.querySelector(".chunk-trans-line").textContent = trans;
@@ -184,20 +169,15 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function updateHeaderLangLabels() {
-    const code = el.partnerLangSelect.value;
-    const pName = window.INTERPRETER_LANGS[code].ko;
+    const code = el.partnerLangSelect?.value || "en";
+    const pName = window.INTERPRETER_LANGS[code]?.ko || "영어";
     if (el.btnLockToKo) el.btnLockToKo.textContent = `${pName} → 한국어 고정`;
     if (el.btnLockFromKo) el.btnLockFromKo.textContent = `한국어 → ${pName} 고정`;
-
     if (el.origLangLabel) {
-      const mode = el.autoModeSelect.value;
-      if (mode === "to_ko_only") {
-        el.origLangLabel.textContent = `실시간 원문 연속 타이핑 (${pName} 음성 인식)`;
-      } else if (mode === "from_ko_only") {
-        el.origLangLabel.textContent = "실시간 원문 연속 타이핑 (한국어 음성 인식)";
-      } else {
-        el.origLangLabel.textContent = `실시간 원문 기록 (한국어·${pName} 자동 감지)`;
-      }
+      const mode = el.autoModeSelect?.value || "to_ko_only";
+      el.origLangLabel.textContent = mode === "to_ko_only"
+        ? `실시간 원문 기록 (${pName} 원음 인식)`
+        : (mode === "from_ko_only" ? "실시간 원문 기록 (한국어 원음 인식)" : `실시간 원문 기록 (한국어·${pName} 자동)`);
     }
   }
 
@@ -207,17 +187,19 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function syncDirectionLockUI() {
-    const mode = el.autoModeSelect.value;
+    const mode = el.autoModeSelect?.value || "to_ko_only";
     el.dirLockBtns.forEach((b) => b.classList.toggle("active", b.dataset.mode === mode));
     updateHeaderLangLabels();
   }
 
   function setStatus(text, cls) {
+    if (!el.statusBadge) return;
     el.statusBadge.textContent = text;
     el.statusBadge.className = "status-badge" + (cls ? " " + cls : "");
   }
 
   function updateMicVisual(speaking) {
+    if (!el.volumeFill || !el.micStateLabel) return;
     el.volumeFill.classList.remove("muted", "no-mic");
     el.micStateLabel.classList.remove("muted", "no-mic");
     if (!engine.isRunning) {
@@ -231,29 +213,32 @@ document.addEventListener("DOMContentLoaded", () => {
       el.micStateLabel.textContent = "텍스트 전용";
       return;
     }
-    if (speaking && (el.duplexModeSelect.value === "smart_guard" || el.duplexModeSelect.value === "speaker_mute")) {
+    if (speaking && el.duplexModeSelect?.value === "smart_guard" && el.autoModeSelect?.value === "auto_both") {
       el.volumeFill.classList.add("muted");
       el.micStateLabel.classList.add("muted");
       el.micStateLabel.textContent = "에코 방지 중";
     } else {
-      el.micStateLabel.textContent = engine.driverMode === "system_audio" ? "탭 소리 연속수신" : "연속 받아쓰기 활성";
+      el.micStateLabel.textContent = engine.driverMode === "system_audio" ? "PC 소리 수신 중" : "마이크 수신 중";
     }
   }
 
   function loadSettings() {
     const legacy = localStorage.getItem("gemini_rt_api_key") || "";
-    el.freeApiKeyInput.value = localStorage.getItem("gemini_rt_free_key") || legacy;
-    el.paidApiKeyInput.value = localStorage.getItem("gemini_rt_paid_key") || "";
+    if (el.freeApiKeyInput) el.freeApiKeyInput.value = localStorage.getItem("gemini_rt_free_key") || legacy;
+    if (el.paidApiKeyInput) el.paidApiKeyInput.value = localStorage.getItem("gemini_rt_paid_key") || "";
     activeTier = localStorage.getItem("gemini_rt_active_tier") === "paid" ? "paid" : "free";
+    if (el.paidApiKeyInput?.value.trim()) activeTier = "paid";
 
     const map = [
-      ["gemini_rt_model_v7", el.modelSelect],
-      ["gemini_rt_sum_model_v7", el.summaryModelSelect],
+      ["gemini_rt_voice_name_v11", el.voiceNameSelect],
+      ["gemini_rt_voice_model_v11", el.voiceModelSelect],
+      ["gemini_rt_model_v11", el.modelSelect],
+      ["gemini_rt_sum_model_v11", el.summaryModelSelect],
       ["gemini_rt_partner_lang", el.partnerLangSelect],
-      ["gemini_rt_auto_mode_v7", el.autoModeSelect],
-      ["gemini_rt_chunk_len_v7", el.chunkIntervalSelect],
-      ["gemini_rt_tts_rate", el.ttsRateSelect],
-      ["gemini_rt_duplex_mode_v7", el.duplexModeSelect],
+      ["gemini_rt_auto_mode_v11", el.autoModeSelect],
+      ["gemini_rt_chunk_len_v11", el.chunkIntervalSelect],
+      ["gemini_rt_tts_rate_v11", el.ttsRateSelect],
+      ["gemini_rt_duplex_mode_v11", el.duplexModeSelect],
       ["gemini_rt_tone", el.toneSelect],
       ["gemini_rt_glossary", el.glossaryInput]
     ];
@@ -262,48 +247,55 @@ document.addEventListener("DOMContentLoaded", () => {
       if (val && node) node.value = val;
     });
 
-    if (el.freeApiKeyInput.value.trim() || el.paidApiKeyInput.value.trim()) {
+    if ((el.freeApiKeyInput?.value.trim() || el.paidApiKeyInput?.value.trim()) && el.settingsPanel) {
       el.settingsPanel.classList.add("hidden");
     }
     updateTierUI();
-    syncQuickLangUI(el.partnerLangSelect.value);
+    syncQuickLangUI(el.partnerLangSelect?.value || "en");
     syncDirectionLockUI();
+    if (el.ch2StateText) el.ch2StateText.textContent = "v11 엔진 준비됨";
   }
 
   function saveSettings() {
-    localStorage.setItem("gemini_rt_free_key", el.freeApiKeyInput.value.trim());
-    localStorage.setItem("gemini_rt_paid_key", el.paidApiKeyInput.value.trim());
+    if (el.freeApiKeyInput) localStorage.setItem("gemini_rt_free_key", el.freeApiKeyInput.value.trim());
+    if (el.paidApiKeyInput) localStorage.setItem("gemini_rt_paid_key", el.paidApiKeyInput.value.trim());
     localStorage.setItem("gemini_rt_active_tier", activeTier);
-    localStorage.setItem("gemini_rt_model_v7", el.modelSelect.value);
-    localStorage.setItem("gemini_rt_sum_model_v7", el.summaryModelSelect.value);
-    localStorage.setItem("gemini_rt_partner_lang", el.partnerLangSelect.value);
-    localStorage.setItem("gemini_rt_auto_mode_v7", el.autoModeSelect.value);
-    localStorage.setItem("gemini_rt_chunk_len_v7", el.chunkIntervalSelect.value);
-    localStorage.setItem("gemini_rt_tts_rate", el.ttsRateSelect.value);
-    localStorage.setItem("gemini_rt_duplex_mode_v7", el.duplexModeSelect.value);
-    localStorage.setItem("gemini_rt_tone", el.toneSelect.value);
-    localStorage.setItem("gemini_rt_glossary", el.glossaryInput.value.trim());
+    if (el.voiceNameSelect) localStorage.setItem("gemini_rt_voice_name_v11", el.voiceNameSelect.value);
+    if (el.voiceModelSelect) localStorage.setItem("gemini_rt_voice_model_v11", el.voiceModelSelect.value);
+    if (el.modelSelect) localStorage.setItem("gemini_rt_model_v11", el.modelSelect.value);
+    if (el.summaryModelSelect) localStorage.setItem("gemini_rt_sum_model_v11", el.summaryModelSelect.value);
+    if (el.partnerLangSelect) localStorage.setItem("gemini_rt_partner_lang", el.partnerLangSelect.value);
+    if (el.autoModeSelect) localStorage.setItem("gemini_rt_auto_mode_v11", el.autoModeSelect.value);
+    if (el.chunkIntervalSelect) localStorage.setItem("gemini_rt_chunk_len_v11", el.chunkIntervalSelect.value);
+    if (el.ttsRateSelect) localStorage.setItem("gemini_rt_tts_rate_v11", el.ttsRateSelect.value);
+    if (el.duplexModeSelect) localStorage.setItem("gemini_rt_duplex_mode_v11", el.duplexModeSelect.value);
+    if (el.toneSelect) localStorage.setItem("gemini_rt_tone", el.toneSelect.value);
+    if (el.glossaryInput) localStorage.setItem("gemini_rt_glossary", el.glossaryInput.value.trim());
   }
 
   function updateTierUI() {
+    if (!el.selectFreeTierBtn || !el.selectPaidTierBtn || !el.headerTierBadge || !el.keyStatusMsg) return;
     if (activeTier === "free") {
       el.selectFreeTierBtn.classList.add("active-free");
       el.selectPaidTierBtn.classList.remove("active-paid");
       el.headerTierBadge.textContent = "무료 키";
       el.headerTierBadge.classList.remove("paid");
       el.keyStatusMsg.style.color = "#60a5fa";
-      el.keyStatusMsg.textContent = el.freeApiKeyInput.value.trim() ? "일상용 무료 키 선택됨" : "무료 키를 입력해 주세요.";
+      el.keyStatusMsg.textContent = el.freeApiKeyInput?.value.trim() ? "무료 키 활성" : "무료 키를 입력해 주세요.";
     } else {
       el.selectPaidTierBtn.classList.add("active-paid");
       el.selectFreeTierBtn.classList.remove("active-free");
       el.headerTierBadge.textContent = "유료 키";
       el.headerTierBadge.classList.add("paid");
       el.keyStatusMsg.style.color = "#fbbf24";
-      el.keyStatusMsg.textContent = el.paidApiKeyInput.value.trim() ? "미팅·학술 유료 키 선택됨 (카본 사용 가능)" : "유료 키를 입력해 주세요.";
+      el.keyStatusMsg.textContent = el.paidApiKeyInput?.value.trim()
+        ? "유료 키 활성 (시간당 약 150~450원 저비용 모드)"
+        : "유료 키를 입력해 주세요.";
     }
   }
 
   function bindFileLoader(fileEl, inputEl, tier) {
+    if (!fileEl || !inputEl) return;
     fileEl.addEventListener("change", (ev) => {
       const f = ev.target.files[0];
       if (!f) return;
@@ -329,6 +321,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll(".btn-key-toggle").forEach((btn) => {
     btn.addEventListener("click", () => {
       const t = document.getElementById(btn.dataset.target);
+      if (!t) return;
       t.type = t.type === "password" ? "text" : "password";
       btn.textContent = t.type === "password" ? "표시" : "숨김";
     });
@@ -337,23 +330,32 @@ document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll(".btn-file-load").forEach((btn) => {
     btn.addEventListener("click", () => {
       const f = document.getElementById(btn.dataset.fileTarget);
+      if (!f) return;
       f.value = "";
       f.click();
     });
   });
 
-  el.selectFreeTierBtn.addEventListener("click", () => { activeTier = "free"; saveSettings(); updateTierUI(); });
-  el.selectPaidTierBtn.addEventListener("click", () => { activeTier = "paid"; saveSettings(); updateTierUI(); });
-  el.headerTierBadge.addEventListener("click", () => el.settingsPanel.classList.remove("hidden"));
-  el.toggleSettingsBtn.addEventListener("click", () => el.settingsPanel.classList.toggle("hidden"));
+  el.selectFreeTierBtn?.addEventListener("click", () => { activeTier = "free"; lastQuotaWarning = ""; saveSettings(); updateTierUI(); });
+  el.selectPaidTierBtn?.addEventListener("click", () => { activeTier = "paid"; lastQuotaWarning = ""; saveSettings(); updateTierUI(); });
+  el.headerTierBadge?.addEventListener("click", () => el.settingsPanel?.classList.remove("hidden"));
+  el.toggleSettingsBtn?.addEventListener("click", () => el.settingsPanel?.classList.toggle("hidden"));
 
-  [el.freeApiKeyInput, el.paidApiKeyInput, el.glossaryInput].forEach((n) => {
-    n.addEventListener("input", () => { saveSettings(); updateTierUI(); });
+  el.paidApiKeyInput?.addEventListener("input", () => {
+    if (el.paidApiKeyInput.value.trim().length >= 20) activeTier = "paid";
+    saveSettings();
+    updateTierUI();
   });
+  el.freeApiKeyInput?.addEventListener("input", () => {
+    if (el.freeApiKeyInput.value.trim().length >= 20 && !el.paidApiKeyInput?.value.trim()) activeTier = "free";
+    saveSettings();
+    updateTierUI();
+  });
+  el.glossaryInput?.addEventListener("input", saveSettings);
 
-  [el.modelSelect, el.summaryModelSelect, el.chunkIntervalSelect, el.ttsRateSelect, el.duplexModeSelect, el.toneSelect].forEach((n) => {
-    n.addEventListener("change", () => {
-      if (el.modelSelect.value === "gemini-4-carbon" && activeTier === "free" && el.paidApiKeyInput.value.trim()) {
+  [el.voiceNameSelect, el.voiceModelSelect, el.modelSelect, el.summaryModelSelect, el.chunkIntervalSelect, el.ttsRateSelect, el.duplexModeSelect, el.toneSelect].forEach((n) => {
+    n?.addEventListener("change", () => {
+      if (el.modelSelect?.value === "gemini-4-carbon" && activeTier === "free" && el.paidApiKeyInput?.value.trim()) {
         activeTier = "paid";
         updateTierUI();
       }
@@ -361,184 +363,186 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  el.autoModeSelect.addEventListener("change", () => {
-    syncDirectionLockUI();
-    saveSettings();
-    if (typeof engine.restartForModeChange === "function") engine.restartForModeChange();
-  });
-
+  el.autoModeSelect?.addEventListener("change", () => { syncDirectionLockUI(); saveSettings(); engine.restartForModeChange(); });
   el.quickLangBtns.forEach((btn) => {
     btn.addEventListener("click", () => {
-      el.partnerLangSelect.value = btn.dataset.lang;
+      if (el.partnerLangSelect) el.partnerLangSelect.value = btn.dataset.lang;
       syncQuickLangUI(btn.dataset.lang);
       saveSettings();
-      if (typeof engine.restartForModeChange === "function") engine.restartForModeChange();
+      engine.restartForModeChange();
     });
   });
-
-  el.partnerLangSelect.addEventListener("change", () => {
-    syncQuickLangUI(el.partnerLangSelect.value);
-    saveSettings();
-    if (typeof engine.restartForModeChange === "function") engine.restartForModeChange();
-  });
-
+  el.partnerLangSelect?.addEventListener("change", () => { syncQuickLangUI(el.partnerLangSelect.value); saveSettings(); engine.restartForModeChange(); });
   el.dirLockBtns.forEach((btn) => {
     btn.addEventListener("click", () => {
-      el.autoModeSelect.value = btn.dataset.mode;
+      if (el.autoModeSelect) el.autoModeSelect.value = btn.dataset.mode;
       syncDirectionLockUI();
       saveSettings();
-      if (typeof engine.restartForModeChange === "function") engine.restartForModeChange();
+      engine.restartForModeChange();
     });
   });
 
-  el.soundTestBtn.addEventListener("click", () => engine.testSound(el.ttsRateSelect.value));
+  el.soundTestBtn?.addEventListener("click", () => engine.testSound());
 
-  async function startInterpreter(customStream = null) {
-    const key = activeTier === "paid" ? el.paidApiKeyInput.value.trim() : el.freeApiKeyInput.value.trim();
-    if (!key) {
-      alert("설정창에서 API 키를 먼저 등록해 주세요.");
-      el.settingsPanel.classList.remove("hidden");
-      return;
+  // PC 시스템/탭 오디오 스트림 획득 공통 함수
+  async function acquireSystemAudioStream() {
+    if (!navigator.mediaDevices?.getDisplayMedia) {
+      alert("PC 크롬 또는 엣지 브라우저에서 시스템 오디오 공유를 지원합니다.");
+      return null;
     }
+    try {
+      const disp = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: true,
+        systemAudio: "include"
+      });
+      disp.getVideoTracks().forEach((t) => t.stop());
+      const aTracks = disp.getAudioTracks();
+      if (aTracks.length === 0) {
+        alert("오디오가 공유되지 않았습니다!\n다시 버튼을 누른 뒤 공유 창 왼쪽 아래의 [탭 오디오도 공유] 또는 [시스템 오디오 공유] 스위치를 꼭 켜주세요.");
+        return null;
+      }
+      if (el.duplexModeSelect) el.duplexModeSelect.value = "full_duplex";
+      const sysStream = new MediaStream(aTracks);
+      aTracks[0].onended = () => stopInterpreter();
+      return sysStream;
+    } catch (err) {
+      return null;
+    }
+  }
 
-    engine.unlockAudio(false);
+  async function beginEngineWithStream(stream, modeLabel) {
+    lastQuotaWarning = "";
     saveSettings();
-    el.settingsPanel.classList.add("hidden");
+    el.settingsPanel?.classList.add("hidden");
 
-    await engine.start(customStream);
+    await engine.startWithStream(stream, modeLabel);
 
-    el.mainActionBtn.textContent = "통역 중지";
-    el.mainActionBtn.className = "btn-main btn-stop";
+    if (el.mainActionBtn) {
+      el.mainActionBtn.textContent = "통역 중지";
+      el.mainActionBtn.className = "btn-main btn-stop";
+    }
     setStatus("동시통역 중", "connected");
     updateMicVisual(false);
 
     if (timerInterval) clearInterval(timerInterval);
     elapsedSec = 1;
-    el.sessionTimerBadge.textContent = "1초";
+    if (el.sessionTimerBadge) el.sessionTimerBadge.textContent = "1초";
     timerInterval = setInterval(() => {
       elapsedSec += 1;
       const m = Math.floor(elapsedSec / 60);
       const s = elapsedSec % 60;
-      el.sessionTimerBadge.textContent = m >= 1 ? `${m}분 ${s}초` : `${s}초`;
+      if (el.sessionTimerBadge) el.sessionTimerBadge.textContent = m >= 1 ? `${m}분 ${s}초` : `${s}초`;
     }, 1000);
 
-    try {
-      if ("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen");
-    } catch (e) {}
+    try { if ("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen"); } catch (e) {}
+  }
+
+  function ensureApiKeyReady() {
+    if (el.paidApiKeyInput?.value.trim() && activeTier === "free" && !el.freeApiKeyInput?.value.trim()) {
+      activeTier = "paid";
+      updateTierUI();
+    }
+    const key = activeTier === "paid" ? el.paidApiKeyInput?.value.trim() : el.freeApiKeyInput?.value.trim();
+    if (!key) {
+      alert("설정창에서 API 키를 먼저 등록해 주세요.");
+      el.settingsPanel?.classList.remove("hidden");
+      return false;
+    }
+    return true;
   }
 
   function stopInterpreter() {
-    if (typeof engine.flushRemainingLiveText === "function") {
-      engine.flushRemainingLiveText();
-    }
+    engine.flushRemainingLiveText();
     engine.stop();
-    updateLivePreviewBubble("");
-    if (timerInterval) {
-      clearInterval(timerInterval);
-      timerInterval = null;
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
+    if (el.mainActionBtn) {
+      el.mainActionBtn.textContent = "통역 시작 (무마이크 시 PC소리 자동연결)";
+      el.mainActionBtn.className = "btn-main btn-start";
     }
-    if (wakeLock) {
-      wakeLock.release().catch(() => {});
-      wakeLock = null;
+    if (el.ch1StateText) el.ch1StateText.textContent = "대기";
+    if (!lastQuotaWarning) {
+      if (el.ch2StateText) el.ch2StateText.textContent = "v11 엔진 준비됨";
+      setStatus("대기", "");
     }
-    el.mainActionBtn.textContent = "통역 시작";
-    el.mainActionBtn.className = "btn-main btn-start";
-    el.ch1StateText.textContent = "대기";
-    el.ch2StateText.textContent = "대기";
-    setStatus("대기", "");
     updateMicVisual(false);
   }
 
-  el.mainActionBtn.addEventListener("click", () => {
-    if (engine.isRunning) stopInterpreter();
-    else startInterpreter(null);
-  });
-
-  el.sysAudioBtn.addEventListener("click", async () => {
-    if (!navigator.mediaDevices?.getDisplayMedia) {
-      alert("PC 크롬 또는 엣지에서 탭 오디오 공유를 지원합니다.");
+  // 파란색 메인 버튼 클릭 시: 마이크가 없으면 즉시 PC 시스템·탭 오디오 공유 창을 자동으로 띄움
+  el.mainActionBtn?.addEventListener("click", async () => {
+    if (engine.isRunning) {
+      stopInterpreter();
       return;
     }
+    if (!ensureApiKeyReady()) return;
     engine.unlockAudio(false);
-    try {
-      const disp = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-      disp.getVideoTracks().forEach((t) => t.stop());
-      const aTracks = disp.getAudioTracks();
-      if (aTracks.length === 0) {
-        alert("공유 창 하단의 탭 오디오 공유 스위치를 켜고 선택해 주세요.");
-        return;
-      }
-      el.duplexModeSelect.value = "full_duplex";
-      saveSettings();
-      const sysStream = new MediaStream(aTracks);
-      aTracks[0].onended = () => stopInterpreter();
-      await startInterpreter(sysStream);
-    } catch (err) {
-      if (err.name !== "NotAllowedError") {
-        alert("탭 오디오 연결 오류: " + err.message);
-      }
+
+    if (!hasMicHardware) {
+      const sysStream = await acquireSystemAudioStream();
+      if (sysStream) await beginEngineWithStream(sysStream, "system_audio");
+      return;
     }
+
+    try {
+      const micStream = await navigator.mediaDevices.getUserMedia({
+        audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+      });
+      await beginEngineWithStream(micStream, "mic");
+    } catch (micErr) {
+      hasMicHardware = false;
+      const sysStream = await acquireSystemAudioStream();
+      if (sysStream) await beginEngineWithStream(sysStream, "system_audio");
+    }
+  });
+
+  el.sysAudioBtn?.addEventListener("click", async () => {
+    if (!ensureApiKeyReady()) return;
+    engine.unlockAudio(false);
+    const sysStream = await acquireSystemAudioStream();
+    if (sysStream) await beginEngineWithStream(sysStream, "system_audio");
   });
 
   function sendManual() {
-    const txt = el.manualTextInput.value.trim();
-    if (!txt) return;
-    const key = activeTier === "paid" ? el.paidApiKeyInput.value.trim() : el.freeApiKeyInput.value.trim();
-    if (!key) {
-      alert("설정창에서 API 키를 먼저 등록해 주세요.");
-      el.settingsPanel.classList.remove("hidden");
-      return;
-    }
+    const txt = el.manualTextInput?.value.trim() || "";
+    if (!txt || !ensureApiKeyReady()) return;
+    lastQuotaWarning = "";
     engine.unlockAudio(false);
     engine.translateManualText(txt);
-    el.manualTextInput.value = "";
+    if (el.manualTextInput) el.manualTextInput.value = "";
   }
 
-  el.sendTextBtn.addEventListener("click", sendManual);
-  el.manualTextInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      sendManual();
-    }
+  el.sendTextBtn?.addEventListener("click", sendManual);
+  el.manualTextInput?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); sendManual(); }
   });
 
-  el.clearBtn.addEventListener("click", () => {
-    el.transcriptBox.innerHTML = "";
-    el.liveOriginalStream.innerHTML = "";
-    el.liveTranslatedStream.textContent = "";
+  el.clearBtn?.addEventListener("click", () => {
+    if (el.transcriptBox) el.transcriptBox.innerHTML = "";
+    if (el.liveOriginalStream) el.liveOriginalStream.textContent = "";
+    if (el.liveTranslatedStream) el.liveTranslatedStream.textContent = "";
     committedOrigHistory = "";
+    lastQuotaWarning = "";
     cardMap.clear();
-    updateLivePreviewBubble("");
-    if (engine.recentTranslations) engine.recentTranslations = [];
-    if (typeof engine.lastLiveUnconsumed === "string") engine.lastLiveUnconsumed = "";
+    engine.recentOrigList = [];
+    engine.recentTranslations = [];
+    engine.resetCostStats();
   });
 
   async function copyText(str) {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      await navigator.clipboard.writeText(str);
-    } else {
-      const area = document.createElement("textarea");
-      area.value = str;
-      area.style.position = "fixed";
-      area.style.left = "-9999px";
-      document.body.appendChild(area);
-      area.select();
-      document.execCommand("copy");
-      document.body.removeChild(area);
-    }
+    if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(str);
   }
 
   function flashToolFeedback(btn, doneText) {
+    if (!btn) return;
     const origLabel = btn.textContent;
     btn.textContent = doneText;
     btn.classList.add("success");
-    setTimeout(() => {
-      btn.textContent = origLabel;
-      btn.classList.remove("success");
-    }, 1500);
+    setTimeout(() => { btn.textContent = origLabel; btn.classList.remove("success"); }, 1500);
   }
 
   function getDialogueLog() {
+    if (!el.transcriptBox) return "";
     return Array.from(el.transcriptBox.querySelectorAll(".bubble.chunk-pair")).map((b) => {
       const t = b.querySelector(".bubble-time")?.textContent || "";
       const o = b.querySelector(".chunk-orig-line")?.textContent || "";
@@ -549,71 +553,34 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function getFullExport() {
     const dlg = getDialogueLog();
-    const cards = el.transcriptBox.querySelectorAll(".bubble.summary-card .bubble-content");
+    const cards = el.transcriptBox?.querySelectorAll(".bubble.summary-card .bubble-content") || [];
     const sum = cards.length >= 1 ? cards[cards.length - 1].textContent.trim() : "";
-    return [
-      sum ? `[이중 언어 회의록 요약]\n${sum}` : "",
-      dlg ? `[전체 통역 기록]\n${dlg}` : ""
-    ].filter(Boolean).join("\n\n====================\n\n");
+    return [sum ? `[이중 언어 회의록 요약]\n${sum}` : "", dlg ? `[전체 통역 기록]\n${dlg}` : ""].filter(Boolean).join("\n\n====================\n\n");
   }
 
-  el.summarizeBtn.addEventListener("click", async () => {
+  el.summarizeBtn?.addEventListener("click", async () => {
     const dlg = getDialogueLog();
-    if (!dlg) {
-      alert("요약할 대화 기록이 없습니다.");
-      return;
-    }
-    const key = activeTier === "paid" ? el.paidApiKeyInput.value.trim() : el.freeApiKeyInput.value.trim();
-    if (!key) {
-      alert("설정창에서 API 키를 먼저 등록해 주세요.");
-      el.settingsPanel.classList.remove("hidden");
-      return;
-    }
-
+    if (!dlg) { alert("요약할 대화 기록이 없습니다."); return; }
     el.summarizeBtn.disabled = true;
     el.summarizeBtn.textContent = "요약 중...";
     try {
-      const pInfo = window.INTERPRETER_LANGS[el.partnerLangSelect.value];
-      const text = await engine.generateBilingualSummary(dlg, el.sessionTimerBadge.textContent);
-      const parts = text.split(/\n\s*-{10,}\s*\n/);
-      const [firstPart, ...restParts] = parts;
+      const pInfo = window.INTERPRETER_LANGS[el.partnerLangSelect?.value || "en"];
+      const text = await engine.generateBilingualSummary(dlg, el.sessionTimerBadge?.textContent || "");
+      const [firstPart, ...restParts] = text.split(/\n\s*-{10,}\s*\n/);
       const koPart = (firstPart || text).trim();
       const forPart = (restParts.join("\n\n") || text).trim();
 
       const card = document.createElement("div");
       card.className = "bubble summary-card";
-      card.innerHTML = `<div class="bubble-header"><span class="bubble-label">이중 언어 요약 (한국어 + ${pInfo.ko})</span><span class="bubble-time">${nowTimeStr()}</span></div><span class="bubble-content"></span><div class="summary-card-actions"><button type="button" class="btn-summary-copy">한국어 요약만 복사하기</button><button type="button" class="btn-summary-copy foreign">${pInfo.ko} 요약만 복사하기</button></div>`;
+      card.innerHTML = `<div class="bubble-header"><span class="bubble-label">이중 언어 요약 (한국어 + ${pInfo.ko})</span><span class="bubble-time">${nowTimeStr()}</span></div><span class="bubble-content"></span><div class="summary-card-actions"><button type="button" class="btn-summary-copy">한국어 요약 복사</button><button type="button" class="btn-summary-copy foreign">${pInfo.ko} 요약 복사</button></div>`;
       card.querySelector(".bubble-content").textContent = text;
 
       const [copyKoBtn, copyForBtn] = card.querySelectorAll(".btn-summary-copy");
-      copyKoBtn.addEventListener("click", async () => {
-        await copyText(koPart);
-        const prev = copyKoBtn.textContent;
-        copyKoBtn.textContent = "한국어 요약 복사됨";
-        copyKoBtn.classList.add("copied");
-        setTimeout(() => {
-          copyKoBtn.textContent = prev;
-          copyKoBtn.classList.remove("copied");
-        }, 1500);
-      });
+      copyKoBtn.addEventListener("click", () => copyText(koPart));
+      copyForBtn.addEventListener("click", () => copyText(forPart));
 
-      copyForBtn.addEventListener("click", async () => {
-        await copyText(forPart);
-        const prev = copyForBtn.textContent;
-        copyForBtn.textContent = `${pInfo.ko} 요약 복사됨`;
-        copyForBtn.classList.add("copied");
-        setTimeout(() => {
-          copyForBtn.textContent = prev;
-          copyForBtn.classList.remove("copied");
-        }, 1500);
-      });
-
-      if (livePreviewCard && livePreviewCard.parentNode === el.transcriptBox) {
-        el.transcriptBox.insertBefore(card, livePreviewCard);
-      } else {
-        el.transcriptBox.appendChild(card);
-      }
-      el.transcriptBox.scrollTop = el.transcriptBox.scrollHeight;
+      el.transcriptBox?.appendChild(card);
+      if (el.transcriptBox) el.transcriptBox.scrollTop = el.transcriptBox.scrollHeight;
     } catch (err) {
       alert("요약 오류: " + err.message);
     } finally {
@@ -622,45 +589,25 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  el.copyLogBtn.addEventListener("click", async () => {
+  el.copyLogBtn?.addEventListener("click", async () => {
     const txt = getFullExport();
-    if (!txt) {
-      alert("복사할 대화 기록이 없습니다.");
-      return;
-    }
-    await copyText(txt);
-    flashToolFeedback(el.copyLogBtn, "복사됨");
+    if (txt) { await copyText(txt); flashToolFeedback(el.copyLogBtn, "복사됨"); }
   });
 
-  el.shareLogBtn.addEventListener("click", async () => {
+  el.shareLogBtn?.addEventListener("click", async () => {
     const txt = getFullExport();
-    if (!txt) {
-      alert("공유할 대화 기록이 없습니다.");
-      return;
-    }
+    if (!txt) return;
     if (navigator.share) {
-      try {
-        await navigator.share({ title: "AI 동시통역 회의록", text: txt });
-        flashToolFeedback(el.shareLogBtn, "공유됨");
-      } catch (err) {
-        if (err.name !== "AbortError") {
-          await copyText(txt);
-          alert("클립보드에 전체 내용을 복사했습니다.");
-        }
-      }
+      try { await navigator.share({ title: "AI 동시통역 회의록", text: txt }); flashToolFeedback(el.shareLogBtn, "공유됨"); } catch (e) {}
     } else {
       await copyText(txt);
       flashToolFeedback(el.shareLogBtn, "복사됨");
-      alert("PC 브라우저에서는 전체 내용을 클립보드에 복사했습니다.");
     }
   });
 
-  el.downloadTxtBtn.addEventListener("click", () => {
+  el.downloadTxtBtn?.addEventListener("click", () => {
     const txt = getFullExport();
-    if (!txt) {
-      alert("저장할 대화 기록이 없습니다.");
-      return;
-    }
+    if (!txt) return;
     const blob = new Blob(["\uFEFF" + txt], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
