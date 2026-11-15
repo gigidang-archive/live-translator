@@ -104,28 +104,12 @@ document.addEventListener("DOMContentLoaded", () => {
     } else {
       el.voiceToggleBtn.textContent = "음성 켜짐";
       el.voiceToggleBtn.classList.remove("muted");
-      if (el.ch2StateText && !lastQuotaWarning) el.ch2StateText.textContent = engine.isRunning ? "대기" : "준비됨";
+      if (el.ch2StateText && !lastQuotaWarning) {
+        const pct = Math.round(parseFloat(el.ttsVolumeSelect?.value || "1.0") * 100);
+        el.ch2StateText.textContent = `음성 켜짐 (${pct}%)`;
+      }
     }
     syncVolumeStepUI();
-  }
-
-  function playVolumeLevelTick(volFloat) {
-    try {
-      engine.unlockAudio(false);
-      const ctx = engine.outputCtx;
-      if (!ctx || engine.isSpeaking) return;
-      const now = ctx.currentTime;
-      const osc = ctx.createOscillator();
-      const g = ctx.createGain();
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(440 + volFloat * 240, now);
-      g.gain.setValueAtTime(Math.max(0.03, 0.28 * volFloat), now);
-      g.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
-      osc.connect(g);
-      g.connect(ctx.destination);
-      osc.start(now);
-      osc.stop(now + 0.12);
-    } catch (e) {}
   }
 
   const engine = new window.GeminiInterpreterEngine({
@@ -171,7 +155,8 @@ document.addEventListener("DOMContentLoaded", () => {
     onSpeakingChange: (speaking) => {
       if (speaking && !voiceMuted) {
         lastQuotaWarning = "";
-        if (el.ch2StateText) el.ch2StateText.textContent = "음성 송출 중";
+        const pct = Math.round(parseFloat(el.ttsVolumeSelect?.value || "1.0") * 100);
+        if (el.ch2StateText) el.ch2StateText.textContent = `음성 송출 중 (${pct}%)`;
         setStatus("음성 송출 중", "speaking");
       } else {
         if (el.ch2StateText && !lastQuotaWarning) {
@@ -297,19 +282,19 @@ document.addEventListener("DOMContentLoaded", () => {
     if (el.paidApiKeyInput) el.paidApiKeyInput.value = localStorage.getItem("gemini_rt_paid_key") || "";
     activeTier = localStorage.getItem("gemini_rt_active_tier") === "paid" ? "paid" : "free";
     if (el.paidApiKeyInput?.value.trim()) activeTier = "paid";
-    voiceMuted = localStorage.getItem("gemini_rt_voice_muted_v13") === "true";
+    voiceMuted = localStorage.getItem("gemini_rt_voice_muted_v15") === "true";
 
     const map = [
-      ["gemini_rt_voice_name_v13", el.voiceNameSelect],
-      ["gemini_rt_voice_model_v13", el.voiceModelSelect],
-      ["gemini_rt_tts_vol_v13", el.ttsVolumeSelect],
-      ["gemini_rt_model_v13", el.modelSelect],
-      ["gemini_rt_sum_model_v13", el.summaryModelSelect],
+      ["gemini_rt_voice_name_v15", el.voiceNameSelect],
+      ["gemini_rt_voice_model_v15", el.voiceModelSelect],
+      ["gemini_rt_tts_vol_v15", el.ttsVolumeSelect],
+      ["gemini_rt_model_v15", el.modelSelect],
+      ["gemini_rt_sum_model_v15", el.summaryModelSelect],
       ["gemini_rt_partner_lang", el.partnerLangSelect],
-      ["gemini_rt_auto_mode_v13", el.autoModeSelect],
-      ["gemini_rt_chunk_len_v13", el.chunkIntervalSelect],
-      ["gemini_rt_tts_rate_v13", el.ttsRateSelect],
-      ["gemini_rt_duplex_mode_v13", el.duplexModeSelect],
+      ["gemini_rt_auto_mode_v15", el.autoModeSelect],
+      ["gemini_rt_chunk_len_v15", el.chunkIntervalSelect],
+      ["gemini_rt_tts_rate_v15", el.ttsRateSelect],
+      ["gemini_rt_duplex_mode_v15", el.duplexModeSelect],
       ["gemini_rt_tone", el.toneSelect],
       ["gemini_rt_glossary", el.glossaryInput]
     ];
@@ -321,8 +306,8 @@ document.addEventListener("DOMContentLoaded", () => {
     if ((el.freeApiKeyInput?.value.trim() || el.paidApiKeyInput?.value.trim()) && el.settingsPanel) {
       el.settingsPanel.classList.add("hidden");
     }
-    engine.setVoiceMuted(voiceMuted);
-    engine.applyOutputVolume();
+    if (typeof engine.setVoiceMuted === "function") engine.setVoiceMuted(voiceMuted, false);
+    if (typeof engine.applyOutputVolume === "function") engine.applyOutputVolume(false);
     updateTierUI();
     syncQuickLangUI(el.partnerLangSelect?.value || "en");
     syncDirectionLockUI();
@@ -333,17 +318,17 @@ document.addEventListener("DOMContentLoaded", () => {
     if (el.freeApiKeyInput) localStorage.setItem("gemini_rt_free_key", el.freeApiKeyInput.value.trim());
     if (el.paidApiKeyInput) localStorage.setItem("gemini_rt_paid_key", el.paidApiKeyInput.value.trim());
     localStorage.setItem("gemini_rt_active_tier", activeTier);
-    localStorage.setItem("gemini_rt_voice_muted_v13", String(voiceMuted));
-    if (el.voiceNameSelect) localStorage.setItem("gemini_rt_voice_name_v13", el.voiceNameSelect.value);
-    if (el.voiceModelSelect) localStorage.setItem("gemini_rt_voice_model_v13", el.voiceModelSelect.value);
-    if (el.ttsVolumeSelect) localStorage.setItem("gemini_rt_tts_vol_v13", el.ttsVolumeSelect.value);
-    if (el.modelSelect) localStorage.setItem("gemini_rt_model_v13", el.modelSelect.value);
-    if (el.summaryModelSelect) localStorage.setItem("gemini_rt_sum_model_v13", el.summaryModelSelect.value);
+    localStorage.setItem("gemini_rt_voice_muted_v15", String(voiceMuted));
+    if (el.voiceNameSelect) localStorage.setItem("gemini_rt_voice_name_v15", el.voiceNameSelect.value);
+    if (el.voiceModelSelect) localStorage.setItem("gemini_rt_voice_model_v15", el.voiceModelSelect.value);
+    if (el.ttsVolumeSelect) localStorage.setItem("gemini_rt_tts_vol_v15", el.ttsVolumeSelect.value);
+    if (el.modelSelect) localStorage.setItem("gemini_rt_model_v15", el.modelSelect.value);
+    if (el.summaryModelSelect) localStorage.setItem("gemini_rt_sum_model_v15", el.summaryModelSelect.value);
     if (el.partnerLangSelect) localStorage.setItem("gemini_rt_partner_lang", el.partnerLangSelect.value);
-    if (el.autoModeSelect) localStorage.setItem("gemini_rt_auto_mode_v13", el.autoModeSelect.value);
-    if (el.chunkIntervalSelect) localStorage.setItem("gemini_rt_chunk_len_v13", el.chunkIntervalSelect.value);
-    if (el.ttsRateSelect) localStorage.setItem("gemini_rt_tts_rate_v13", el.ttsRateSelect.value);
-    if (el.duplexModeSelect) localStorage.setItem("gemini_rt_duplex_mode_v13", el.duplexModeSelect.value);
+    if (el.autoModeSelect) localStorage.setItem("gemini_rt_auto_mode_v15", el.autoModeSelect.value);
+    if (el.chunkIntervalSelect) localStorage.setItem("gemini_rt_chunk_len_v15", el.chunkIntervalSelect.value);
+    if (el.ttsRateSelect) localStorage.setItem("gemini_rt_tts_rate_v15", el.ttsRateSelect.value);
+    if (el.duplexModeSelect) localStorage.setItem("gemini_rt_duplex_mode_v15", el.duplexModeSelect.value);
     if (el.toneSelect) localStorage.setItem("gemini_rt_tone", el.toneSelect.value);
     if (el.glossaryInput) localStorage.setItem("gemini_rt_glossary", el.glossaryInput.value.trim());
   }
@@ -426,39 +411,54 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   el.glossaryInput?.addEventListener("input", saveSettings);
 
-  [el.voiceNameSelect, el.voiceModelSelect, el.ttsVolumeSelect, el.modelSelect, el.summaryModelSelect, el.chunkIntervalSelect, el.ttsRateSelect, el.duplexModeSelect, el.toneSelect].forEach((n) => {
+  [el.voiceNameSelect, el.voiceModelSelect, el.modelSelect, el.summaryModelSelect, el.chunkIntervalSelect, el.ttsRateSelect, el.duplexModeSelect, el.toneSelect].forEach((n) => {
     n?.addEventListener("change", () => {
       if (el.modelSelect?.value === "gemini-4-carbon" && activeTier === "free" && el.paidApiKeyInput?.value.trim()) {
         activeTier = "paid";
         updateTierUI();
       }
-      engine.applyOutputVolume();
-      syncVolumeStepUI();
       saveSettings();
     });
   });
 
+  el.ttsVolumeSelect?.addEventListener("change", () => {
+    syncVolumeStepUI();
+    saveSettings();
+    if (typeof engine.applyOutputVolume === "function") engine.applyOutputVolume(true);
+  });
+
   el.voiceToggleBtn?.addEventListener("click", () => {
     voiceMuted = !voiceMuted;
-    engine.setVoiceMuted(voiceMuted);
-    saveSettings();
     syncVoiceMuteUI();
+    saveSettings();
+    if (typeof engine.playInstantFeedbackTone === "function") {
+      const curVol = parseFloat(el.ttsVolumeSelect?.value || "1.0");
+      engine.playInstantFeedbackTone(curVol, voiceMuted);
+    }
+    if (typeof engine.setVoiceMuted === "function") {
+      engine.setVoiceMuted(voiceMuted, !voiceMuted);
+    }
   });
 
   el.volStepBtn?.addEventListener("click", () => {
     if (voiceMuted) {
       voiceMuted = false;
-      engine.setVoiceMuted(false);
+      if (typeof engine.setVoiceMuted === "function") engine.setVoiceMuted(false, false);
     } else {
       const curVal = el.ttsVolumeSelect?.value || "1.0";
       const curIdx = VOLUME_STEPS.indexOf(curVal);
       const nextVal = VOLUME_STEPS[(curIdx + 1) % VOLUME_STEPS.length];
       if (el.ttsVolumeSelect) el.ttsVolumeSelect.value = nextVal;
     }
-    engine.applyOutputVolume();
-    saveSettings();
     syncVoiceMuteUI();
-    playVolumeLevelTick(parseFloat(el.ttsVolumeSelect?.value || "1.0"));
+    saveSettings();
+    const newVol = parseFloat(el.ttsVolumeSelect?.value || "1.0");
+    if (typeof engine.playInstantFeedbackTone === "function") {
+      engine.playInstantFeedbackTone(newVol, false);
+    }
+    if (typeof engine.applyOutputVolume === "function") {
+      engine.applyOutputVolume(true);
+    }
   });
 
   el.autoModeSelect?.addEventListener("change", () => { syncDirectionLockUI(); saveSettings(); engine.restartForModeChange(); });
@@ -723,7 +723,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  el.downloadTxtBtn?.addEventListener("click", () => {
+  el.downloadTxtBtn?.addEventListener("click", async () => {
     const txt = getFullExport();
     if (!txt) return;
     const blob = new Blob(["\uFEFF" + txt], { type: "text/plain;charset=utf-8" });
