@@ -297,7 +297,6 @@
       grid-template-columns: 1fr 1fr;
       gap: 8px;
     }
-    /* 이중 파이프라인 실시간 모니터 (원문 연속 스트림 + 동시통역 연속 스트림) */
     .dual-live-monitor {
       background-color: #0b1120;
       border-bottom: 1px solid #334155;
@@ -635,7 +634,7 @@
   <div class="log-toolbar">
     <div class="log-toolbar-left">
       <span id="sessionTimerBadge" class="session-timer-badge" title="총 경과 시간">00:00</span>
-      <span id="pipelineStatusBadge" class="pipeline-badge">2초 슬라이딩 병렬</span>
+      <span id="pipelineStatusBadge" class="pipeline-badge">2.0초 병렬</span>
     </div>
     <div class="log-toolbar-actions">
       <button id="summarizeBtn" class="btn-tool summary-btn" type="button">이중언어 요약</button>
@@ -705,19 +704,19 @@
         </select>
       </div>
       <div class="field-group">
-        <label for="duplexModeSelect">오디오 송수신 방식 (에코 제어)</label>
-        <select id="duplexModeSelect">
-          <option value="full_duplex">동시 송수신 유지 (이어폰/시스템오디오 권장)</option>
-          <option value="speaker_duck">스피커 감쇠 모드 (송출 중 입력 민감도 조절)</option>
+        <label for="ttsEngineSelect">음성 출력 엔진 선택</label>
+        <select id="ttsEngineSelect">
+          <option value="hybrid">하이브리드 (Gemini 음성 + 즉시 백업TTS)</option>
+          <option value="browser_fast">초고속 기기 음성 엔진 (지연 0.1초 · 끊김 없음)</option>
         </select>
       </div>
     </div>
     <div class="row-2">
       <div class="field-group">
-        <label for="voiceOutputSelect">음성 출력 설정</label>
-        <select id="voiceOutputSelect">
-          <option value="on">2초 단위 동시 음성 출력 + 화면 기록</option>
-          <option value="off">무음 모드 (실시간 자막만 기록)</option>
+        <label for="duplexModeSelect">오디오 송수신 방식 (에코 제어)</label>
+        <select id="duplexModeSelect">
+          <option value="full_duplex">동시 송수신 유지 (이어폰/시스템오디오 권장)</option>
+          <option value="speaker_duck">스피커 감쇠 모드 (송출 중 입력 민감도 조절)</option>
         </select>
       </div>
       <div class="field-group">
@@ -732,16 +731,15 @@
     <div class="row-2">
       <div class="field-group">
         <label for="modelInput">실시간 음성 엔진 모델 ID</label>
-        <input type="text" id="modelInput" list="liveModelList" value="gemini-2.5-flash-native-audio-preview-12-2025" />
+        <input type="text" id="modelInput" list="liveModelList" value="gemini-2.0-flash-exp" />
         <datalist id="liveModelList">
-          <option value="gemini-2.5-flash-native-audio-preview-12-2025"></option>
-          <option value="gemini-3.8-live"></option>
-          <option value="gemini-3.1-flash-live-preview"></option>
           <option value="gemini-2.0-flash-exp"></option>
+          <option value="gemini-2.5-flash-native-audio-preview-09-2025"></option>
+          <option value="gemini-2.5-flash-native-audio-preview-12-2025"></option>
         </datalist>
       </div>
       <div class="field-group">
-        <label for="voiceNameSelect">동시통역사 목소리</label>
+        <label for="voiceNameSelect">AI 통역사 목소리</label>
         <select id="voiceNameSelect">
           <option value="Aoede">Aoede (차분한 여성)</option>
           <option value="Puck">Puck (경쾌한 남성)</option>
@@ -756,7 +754,6 @@
     </div>
   </section>
 
-  <!-- 상단 고정 실시간 이중 파이프라인 모니터 -->
   <section class="dual-live-monitor">
     <div class="monitor-pane">
       <div class="monitor-head">
@@ -776,7 +773,7 @@
 
   <main id="transcriptBox" class="transcript-container">
     <div class="bubble system">
-      이어폰을 한쪽 귀에 착용한 상태로 통역 시작을 누르시면 마이크가 닫히지 않고 100% 열려 있어, 연사가 계속 말하는 중에도 2초 시차로 원문 기록과 동시 음성 통역이 동시에 진행됩니다.
+      PC와 모바일 크롬의 오디오 출력 엔진이 복구되었습니다. 통역 시작을 누른 뒤 말하거나 하단 입력창에 문장을 입력해 테스트하면 즉시 음성이 출력됩니다.
     </div>
   </main>
 
@@ -788,7 +785,7 @@
       <span id="micStateLabel" class="mic-state-label">오디오 대기</span>
     </div>
     <div class="text-send-row">
-      <input type="text" id="manualTextInput" placeholder="직접 문장을 입력해 즉시 동시통역 음성으로 내보내기..." />
+      <input type="text" id="manualTextInput" placeholder="여기에 한국어나 영어를 입력 후 음성 전송을 눌러 소리 테스트..." />
       <button type="button" id="sendTextBtn" class="btn-text-send">음성 전송</button>
     </div>
     <div id="modeStatusBar" class="mode-status-bar" title="탭하면 양방향/단방향 고정을 전환합니다">
@@ -815,8 +812,8 @@
     const partnerLangSelect = document.getElementById("partnerLangSelect");
     const autoModeSelect = document.getElementById("autoModeSelect");
     const chunkIntervalSelect = document.getElementById("chunkIntervalSelect");
+    const ttsEngineSelect = document.getElementById("ttsEngineSelect");
     const duplexModeSelect = document.getElementById("duplexModeSelect");
-    const voiceOutputSelect = document.getElementById("voiceOutputSelect");
     const toneSelect = document.getElementById("toneSelect");
     const modelInput = document.getElementById("modelInput");
     const voiceNameSelect = document.getElementById("voiceNameSelect");
@@ -862,22 +859,20 @@
     let hasAudioInputSource = false;
     let audioSourceMode = "none";
 
-    // 이중 파이프라인 WebSocket 인스턴스
-    let wsListener = null; // 채널 1: 연속 원문 청취 및 전사
-    let wsSpeaker = null;  // 채널 2: 연속 음성 합성 송출
+    let wsListener = null;
+    let wsSpeaker = null;
+    let isSpeakerReady = false;
 
-    // 2초 슬라이딩 청크 파이프라인 상태
     let pendingTranscriptBuffer = "";
     let lastTranscriptReceivedAt = 0;
     let slidingChunkTimer = null;
-    let chunkSequenceCounter = 0; // 1부터 시작
-    let nextExpectedPlaySeq = 1;  // 1부터 시작
+    let chunkSequenceCounter = 0;
+    let nextExpectedPlaySeq = 1;
     let completedChunkResults = new Map();
     let recentTranslatedHistory = [];
     let speakerSpeechQueue = [];
     let isSpeakerBusy = false;
 
-    // 2.2초 직접 오디오 백업 청커 (전사 지연 시 즉각 작동)
     let pcmBackupSamples = [];
     let pcmBackupActiveVoiceSamples = 0;
     let isBackupPcmInFlight = false;
@@ -892,9 +887,10 @@
     let processorNode = null;
     let muteGainNode = null;
 
-    // 연속 링 버퍼 오디오 재생 엔진
+    // 연속 링 버퍼 오디오 재생 엔진 (크롬 0채널 버그 해결을 위한 더미 입력 연결 포함)
     let outputAudioCtx = null;
     let playbackScriptNode = null;
+    let dummyInputGain = null;
     let ringBuffer = null;
     let ringCapacity = 0;
     let ringWritePos = 0;
@@ -914,8 +910,8 @@
       const savedPartner = localStorage.getItem("gemini_rt_partner_lang");
       const savedAutoMode = localStorage.getItem("gemini_rt_auto_mode");
       const savedChunkMs = localStorage.getItem("gemini_rt_chunk_ms");
+      const savedTtsEngine = localStorage.getItem("gemini_rt_tts_engine");
       const savedDuplex = localStorage.getItem("gemini_rt_duplex_mode");
-      const savedVoiceOut = localStorage.getItem("gemini_rt_voice_out");
       const savedTone = localStorage.getItem("gemini_rt_tone");
       const savedModel = localStorage.getItem("gemini_rt_model");
       const savedVoiceName = localStorage.getItem("gemini_rt_voice_name");
@@ -931,12 +927,12 @@
       if (savedPartner) partnerLangSelect.value = savedPartner;
       if (savedAutoMode) autoModeSelect.value = savedAutoMode;
       if (savedChunkMs) chunkIntervalSelect.value = savedChunkMs;
+      if (savedTtsEngine) ttsEngineSelect.value = savedTtsEngine;
       if (savedDuplex) duplexModeSelect.value = savedDuplex;
-      if (savedVoiceOut) voiceOutputSelect.value = savedVoiceOut;
       if (savedTone) toneSelect.value = savedTone;
       if (savedModel) {
-        modelInput.value = savedModel === "gemini-2.0-flash-exp"
-          ? "gemini-2.5-flash-native-audio-preview-12-2025"
+        modelInput.value = savedModel === "gemini-2.5-flash-native-audio-preview-12-2025"
+          ? "gemini-2.0-flash-exp"
           : savedModel;
       }
       if (savedVoiceName) voiceNameSelect.value = savedVoiceName;
@@ -954,8 +950,8 @@
       localStorage.setItem("gemini_rt_partner_lang", partnerLangSelect.value);
       localStorage.setItem("gemini_rt_auto_mode", autoModeSelect.value);
       localStorage.setItem("gemini_rt_chunk_ms", chunkIntervalSelect.value);
+      localStorage.setItem("gemini_rt_tts_engine", ttsEngineSelect.value);
       localStorage.setItem("gemini_rt_duplex_mode", duplexModeSelect.value);
-      localStorage.setItem("gemini_rt_voice_out", voiceOutputSelect.value);
       localStorage.setItem("gemini_rt_tone", toneSelect.value);
       localStorage.setItem("gemini_rt_model", modelInput.value.trim());
       localStorage.setItem("gemini_rt_voice_name", voiceNameSelect.value);
@@ -991,7 +987,7 @@
       updateTierUI();
 
       if (isRunning) {
-        addSystemMessage(`API 키 등급이 [${newTier === "free" ? "무료 키" : "유료 키"}]로 변경되었습니다. 이중 파이프라인을 새 키로 무중단 재연결합니다.`);
+        addSystemMessage(`API 키 등급이 [${newTier === "free" ? "무료 키" : "유료 키"}]로 변경되었습니다. 새 키로 무중단 재연결합니다.`);
         renewDualPipelines("등급 전환");
       }
     }
@@ -1112,11 +1108,12 @@
 
     partnerLangSelect.addEventListener("change", () => selectPartnerLanguage(partnerLangSelect.value));
     duplexModeSelect.addEventListener("change", () => saveSettings());
+    ttsEngineSelect.addEventListener("change", () => saveSettings());
     chunkIntervalSelect.addEventListener("change", () => {
       saveSettings();
       updateModeStatusUI();
       if (isRunning) {
-        restartSlidingChunkLoop();
+        startSlidingChunkLoop();
       }
     });
 
@@ -1141,7 +1138,7 @@
       const mode = autoModeSelect.value;
       const secLabel = (parseInt(chunkIntervalSelect.value, 10) / 1000).toFixed(1) + "초";
       const pill = modeStatusBar.querySelector(".mode-pill");
-      pipelineStatusBadge.textContent = `${secLabel} 슬라이딩 병렬`;
+      pipelineStatusBadge.textContent = `${secLabel} 병렬`;
 
       if (mode === "auto_both") {
         modeStatusText.textContent = `이중 파이프라인 양방향: 한국어 ↔ ${partnerKoName} (${secLabel} 주기)`;
@@ -1199,6 +1196,7 @@
         try { wsSpeaker.close(1000, "Renew speaker"); } catch (e) {}
         wsSpeaker = null;
       }
+      isSpeakerReady = false;
 
       setTimeout(() => {
         if (!isRunning) {
@@ -1509,7 +1507,7 @@
         alert("먼저 하단의 통역 시작 버튼을 눌러 파이프라인을 실행해 주세요.");
         return;
       }
-      initContinuousPlaybackEngine();
+      unlockAllAudioEngines();
       const seqId = ++chunkSequenceCounter;
       dispatchParallelTextChunk(seqId, text);
       manualTextInput.value = "";
@@ -1528,7 +1526,7 @@
         alert("PC 크롬 또는 엣지 브라우저에서 탭·시스템 오디오 캡처를 지원합니다.");
         return;
       }
-      initContinuousPlaybackEngine();
+      unlockAllAudioEngines();
       try {
         const displayStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
         displayStream.getVideoTracks().forEach((t) => t.stop());
@@ -1569,12 +1567,25 @@
       if (isRunning || isConnecting) {
         stopSession();
       } else {
-        initContinuousPlaybackEngine();
+        // 사용자 클릭 이벤트 안에서 Web Audio 링 버퍼와 브라우저 TTS 잠금을 동기적으로 모두 해제
+        unlockAllAudioEngines();
         startSession();
       }
     });
 
-    // 연속 링 버퍼(Ring Buffer) 재생 엔진
+    function unlockAllAudioEngines() {
+      initContinuousPlaybackEngine();
+      try {
+        if ("speechSynthesis" in window) {
+          window.speechSynthesis.cancel();
+          const unlockUtter = new SpeechSynthesisUtterance("");
+          unlockUtter.volume = 0;
+          window.speechSynthesis.speak(unlockUtter);
+        }
+      } catch (e) {}
+    }
+
+    // 크롬 0채널 ScriptProcessor 버그를 해결한 연속 링 버퍼 재생 엔진
     function initContinuousPlaybackEngine() {
       try {
         if (!outputAudioCtx || outputAudioCtx.state === "closed") {
@@ -1596,7 +1607,16 @@
         }
 
         if (!playbackScriptNode) {
-          playbackScriptNode = outputAudioCtx.createScriptProcessor(1024, 0, 1);
+          // 입력 채널을 1로 설정하고 무음 Oscillator를 연결해야 크롬에서 onaudioprocess가 정상 작동함
+          playbackScriptNode = outputAudioCtx.createScriptProcessor(1024, 1, 1);
+          dummyInputGain = outputAudioCtx.createGain();
+          dummyInputGain.gain.value = 0;
+          const dummyOsc = outputAudioCtx.createOscillator();
+          dummyOsc.frequency.value = 440;
+          dummyOsc.connect(dummyInputGain);
+          dummyInputGain.connect(playbackScriptNode);
+          dummyOsc.start(0);
+
           playbackScriptNode.onaudioprocess = (event) => {
             const output = event.outputBuffer.getChannelData(0);
             const len = output.length;
@@ -1615,7 +1635,7 @@
               ringPrebuffering = true;
               if (isAiSpeaking) {
                 isAiSpeaking = false;
-                ch2StateText.textContent = "대기";
+                ch2StateText.textContent = "음성 대기";
                 updateAudioGateIndicator();
                 if (isRunning) setStatus("이중 파이프라인 가동", "connected");
               }
@@ -1624,7 +1644,7 @@
 
             const toRead = Math.min(len, ringAvailableSamples);
             for (let i = 0; i < toRead; i++) {
-              let sample = ringBuffer[ringReadPos] * 1.35;
+              let sample = ringBuffer[ringReadPos] * 1.4;
               if (sample > 0.98) sample = 0.98;
               if (sample < -0.98) sample = -0.98;
               output[i] = sample;
@@ -1716,7 +1736,7 @@
       div.innerHTML = `
         <div class="error-diag-title">파이프라인 연결 진단 (종료 코드: ${code})</div>
         <div class="error-diag-reason">${reason ? "서버 반환 사유: " + reason : "상세 사유 없음"}</div>
-        <div class="error-diag-hint">설정창의 API 키와 실시간 음성 모델 ID(gemini-2.5-flash-native-audio-preview-12-2025)를 확인해 주세요.</div>
+        <div class="error-diag-hint">설정창의 API 키와 실시간 음성 모델 ID(gemini-2.0-flash-exp 또는 gemini-2.5-flash-native-audio-preview-09-2025)를 확인해 주세요.</div>
       `;
       transcriptBox.appendChild(div);
       transcriptBox.scrollTop = transcriptBox.scrollHeight;
@@ -1796,15 +1816,14 @@
       connectDualWebSockets(false, "");
     }
 
-    // 채널 1(원문 연속 전사)과 채널 2(병렬 음성 합성) 동시 개설
     function connectDualWebSockets(isRenewal, renewalReason) {
       const apiKey = getActiveApiKey();
       const tierLabel = activeKeyTier === "paid" ? "유료 키" : "무료 키";
-      const modelName = modelInput.value.trim() || "gemini-2.5-flash-native-audio-preview-12-2025";
+      const modelName = modelInput.value.trim() || "gemini-2.0-flash-exp";
       const voiceName = voiceNameSelect.value || "Aoede";
       const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${encodeURIComponent(apiKey)}`;
 
-      // 1. 채널 1 WebSocket: 듣기 및 원문 전사 전용 (음성 출력 무음 처리하여 청취만 전담)
+      // 1. 채널 1 WebSocket: 연속 청취 및 실시간 원문 전사 전담
       const listenerSock = new WebSocket(wsUrl);
       wsListener = listenerSock;
 
@@ -1818,7 +1837,7 @@
             },
             systemInstruction: {
               parts: [{
-                text: "You are a silent passive audio transcriber. Never speak, never reply, and never generate audio. Just listen silently to incoming speech."
+                text: "You are an audio transcription listener. Acknowledge speech silently with a brief single-syllable hum only when needed, and transcribe all spoken input accurately."
               }]
             },
             inputAudioTranscription: {}
@@ -1844,7 +1863,7 @@
           liveOriginalStream.textContent = "";
           liveTranslatedStream.textContent = "";
           const partnerKoName = LANG_NAMES[partnerLangSelect.value].ko;
-          addSystemMessage(`[${tierLabel}] 이중 파이프라인 가동 시작. 원문은 멈춤 없이 실시간 기록되고, ${partnerKoName}·한국어 동시통역 음성이 2초 단위로 병렬 송출됩니다.`);
+          addSystemMessage(`[${tierLabel}] 연결 완료. 말하거나 하단 입력창에 문장을 입력하면 ${partnerKoName}·한국어 동시통역 음성이 즉시 출력됩니다.`);
         } else {
           addSystemMessage(`이중 파이프라인 무중단 갱신 완료 (${renewalReason})`);
         }
@@ -1864,7 +1883,6 @@
         const sc = data.serverContent;
         if (sc && sc.inputTranscription && sc.inputTranscription.text) {
           const piece = sc.inputTranscription.text;
-          // 전사가 정상 도착하면 백업 PCM 버퍼는 비움
           pcmBackupSamples = [];
           pcmBackupActiveVoiceSamples = 0;
 
@@ -1874,9 +1892,7 @@
           liveOriginalStream.textContent += piece;
           liveOriginalStream.scrollTop = liveOriginalStream.scrollHeight;
 
-          // 1.2초 이상 경과 후 구두점(마침표, 쉼표, 물음표)이 포착되면 2초를 채우지 않고 즉시 조기 발사
-          const minEarlyMs = Math.max(1000, parseInt(chunkIntervalSelect.value, 10) - 600);
-          if (/[.,?!。、？！]\s*$/.test(pendingTranscriptBuffer) && pendingTranscriptBuffer.trim().length >= 6) {
+          if (/[.,?!。、？！]\s*$/.test(pendingTranscriptBuffer) && pendingTranscriptBuffer.trim().length >= 5) {
             flushPendingTranscriptChunk();
           }
         }
@@ -1893,68 +1909,77 @@
         }
       };
 
-      // 2. 채널 2 WebSocket: 2초 단위 직독직해 결과물을 고음질 원어민 음성으로 즉시 합성하는 전용 출력기
-      const speakerSock = new WebSocket(wsUrl);
-      wsSpeaker = speakerSock;
+      // 2. 채널 2 WebSocket: 하이브리드 모드일 때 Gemini 원어민 음성 합성 전담
+      isSpeakerReady = false;
+      if (ttsEngineSelect.value === "hybrid") {
+        const speakerSock = new WebSocket(wsUrl);
+        wsSpeaker = speakerSock;
 
-      speakerSock.onopen = () => {
-        if (wsSpeaker !== speakerSock) return;
-        const speakerSetup = {
-          setup: {
-            model: `models/${modelName}`,
-            generationConfig: {
-              responseModalities: ["AUDIO"],
-              speechConfig: {
-                voiceConfig: {
-                  prebuiltVoiceConfig: {
-                    voiceName: voiceName
+        speakerSock.onopen = () => {
+          if (wsSpeaker !== speakerSock) return;
+          const speakerSetup = {
+            setup: {
+              model: `models/${modelName}`,
+              generationConfig: {
+                responseModalities: ["AUDIO"],
+                speechConfig: {
+                  voiceConfig: {
+                    prebuiltVoiceConfig: {
+                      voiceName: voiceName
+                    }
                   }
                 }
+              },
+              systemInstruction: {
+                parts: [{
+                  text: "You are a voice synthesizer. Read aloud the exact user text sent to you immediately and clearly. Never add greetings or extra words."
+                }]
               }
-            },
-            systemInstruction: {
-              parts: [{
-                text: "You are a dedicated simultaneous interpretation voice synthesizer. Read aloud the exact user text sent to you immediately, clearly, and at a natural brisk interpreter pace. Never add greetings, explanations, or extra words. Output ONLY the spoken audio of the exact text given."
-              }]
             }
-          }
+          };
+          speakerSock.send(JSON.stringify(speakerSetup));
+          isSpeakerReady = true;
+          ch2StateText.textContent = "Gemini 음성 준비됨";
         };
-        speakerSock.send(JSON.stringify(speakerSetup));
-        ch2StateText.textContent = "음성엔진 대기";
-      };
 
-      speakerSock.onmessage = async (event) => {
-        if (wsSpeaker !== speakerSock) return;
-        let rawText = event.data;
-        if (rawText instanceof Blob) rawText = await rawText.text();
-        const data = JSON.parse(rawText);
+        speakerSock.onmessage = async (event) => {
+          if (wsSpeaker !== speakerSock) return;
+          let rawText = event.data;
+          if (rawText instanceof Blob) rawText = await rawText.text();
+          const data = JSON.parse(rawText);
 
-        const sc = data.serverContent;
-        if (!sc) return;
+          const sc = data.serverContent;
+          if (!sc) return;
 
-        if (sc.modelTurn && sc.modelTurn.parts) {
-          for (const part of sc.modelTurn.parts) {
-            if (part.inlineData && part.inlineData.mimeType && part.inlineData.mimeType.startsWith("audio/pcm")) {
-              if (voiceOutputSelect.value === "on") {
+          if (sc.modelTurn && sc.modelTurn.parts) {
+            for (const part of sc.modelTurn.parts) {
+              if (part.inlineData && part.inlineData.mimeType && part.inlineData.mimeType.startsWith("audio/pcm")) {
                 pushPcm24kToRingBuffer(part.inlineData.data);
               }
             }
           }
-        }
 
-        if (sc.turnComplete) {
+          if (sc.turnComplete) {
+            isSpeakerBusy = false;
+            pumpSpeakerQueue();
+          }
+        };
+
+        speakerSock.onclose = (e) => {
+          if (wsSpeaker !== speakerSock || isRenewing) return;
+          isSpeakerReady = false;
           isSpeakerBusy = false;
+          ch2StateText.textContent = "기기 음성 엔진 전환됨";
+          if (e.code !== 1000 && e.code !== 1005) {
+            addSystemMessage(`안내: 채널 2 음성 합성 소켓이 종료(코드 ${e.code})되어 초고속 기기 음성 엔진으로 자동 전환되었습니다.`);
+          }
           pumpSpeakerQueue();
-        }
-      };
-
-      speakerSock.onclose = () => {
-        if (wsSpeaker !== speakerSock || isRenewing) return;
-        isSpeakerBusy = false;
-      };
+        };
+      } else {
+        ch2StateText.textContent = "기기 음성 엔진 활성";
+      }
     }
 
-    // 2초 슬라이딩 청크 루프 시작
     function startSlidingChunkLoop() {
       stopSlidingChunkLoop();
       const intervalMs = parseInt(chunkIntervalSelect.value, 10) || 2000;
@@ -1981,7 +2006,6 @@
       dispatchParallelTextChunk(seqId, textToTranslate);
     }
 
-    // 비동기 병렬 직독직해 번역기 (시퀀스 번호 1, 2, 3... 순서 보장 출력)
     async function dispatchParallelTextChunk(seqId, originalChunkText) {
       const apiKey = getActiveApiKey();
       if (!apiKey) return;
@@ -2049,7 +2073,6 @@
       commitOrderedChunks();
     }
 
-    // 병렬로 도착한 번역 구절을 1, 2, 3 순서대로 정렬해 화면 기록 및 음성 합성 큐에 투입
     function commitOrderedChunks() {
       while (completedChunkResults.has(nextExpectedPlaySeq)) {
         const seq = nextExpectedPlaySeq;
@@ -2067,10 +2090,7 @@
           liveTranslatedStream.scrollTop = liveTranslatedStream.scrollHeight;
 
           appendChunkPairCard(seq, item.orig, item.trans);
-
-          if (voiceOutputSelect.value === "on") {
-            enqueueSpeakerText(item.trans);
-          }
+          enqueueSpeakerText(item.trans);
         }
       }
     }
@@ -2101,7 +2121,8 @@
       if (isSpeakerBusy || speakerSpeechQueue.length === 0) return;
       const nextText = speakerSpeechQueue.shift();
 
-      if (wsSpeaker && wsSpeaker.readyState === WebSocket.OPEN) {
+      const useHybridWs = ttsEngineSelect.value === "hybrid" && isSpeakerReady && wsSpeaker && wsSpeaker.readyState === WebSocket.OPEN;
+      if (useHybridWs) {
         isSpeakerBusy = true;
         wsSpeaker.send(JSON.stringify({
           clientContent: {
@@ -2113,13 +2134,21 @@
           }
         }));
       } else {
-        // 웹소켓 스피커가 일시 재연결 중일 경우 브라우저 내장 음성 합성으로 무중단 백업 출력
-        speakWithBrowserTtsFallback(nextText);
+        speakWithBrowserTts(nextText);
       }
     }
 
-    function speakWithBrowserTtsFallback(text) {
-      if (!("speechSynthesis" in window)) return;
+    function speakWithBrowserTts(text) {
+      if (!("speechSynthesis" in window)) {
+        isSpeakerBusy = false;
+        return;
+      }
+      isSpeakerBusy = true;
+      isAiSpeaking = true;
+      ch2StateText.textContent = "음성 송출 중";
+      updateAudioGateIndicator();
+      setStatus("동시통역 음성 송출", "speaking");
+
       const utter = new SpeechSynthesisUtterance(text);
       const isKorean = /[가-힣]/.test(text);
       if (isKorean) {
@@ -2128,11 +2157,27 @@
         const map = { en: "en-US", zh: "zh-CN", ja: "ja-JP", es: "es-ES" };
         utter.lang = map[partnerLangSelect.value] || "en-US";
       }
-      utter.rate = 1.12;
+      utter.rate = 1.1;
+      utter.volume = 1.0;
+
+      utter.onend = () => {
+        isSpeakerBusy = false;
+        isAiSpeaking = false;
+        ch2StateText.textContent = "음성 대기";
+        updateAudioGateIndicator();
+        if (isRunning) setStatus("이중 파이프라인 가동", "connected");
+        pumpSpeakerQueue();
+      };
+      utter.onerror = () => {
+        isSpeakerBusy = false;
+        isAiSpeaking = false;
+        pumpSpeakerQueue();
+      };
+
       window.speechSynthesis.speak(utter);
     }
 
-    // 2.2초 직접 오디오 백업 파이프라인 (전사 지연 시 원음 WAV 슬라이스를 직접 멀티모달로 병렬 통역)
+    // 전사가 지연될 때 2.0초 분량의 음성 데이터를 직접 멀티모달로 번역·송출하는 백업 파이프라인
     async function dispatchDirectAudioBackup(float32Samples16k) {
       if (isBackupPcmInFlight) return;
       const apiKey = getActiveApiKey();
@@ -2151,7 +2196,7 @@
       if (mode === "to_ko_only") dirDesc = "외국어 음성을 한국어로";
       if (mode === "from_ko_only") dirDesc = `한국어 음성을 ${partnerInfo.ko}(${partnerInfo.en})로`;
 
-      const prompt = `들리는 음성의 원문을 그대로 받아적고(orig), ${dirDesc} ${tone === "formal" ? "격식체" : "자연스러운 존댓말"} 직독직해 동시통역(trans)을 수행해 반드시 JSON 형식 {"orig":"원문","trans":"통역문"} 으로만 출력하십시오.`;
+      const prompt = `들리는 음성의 원문을 받아적고(orig), ${dirDesc} ${tone === "formal" ? "격식체" : "자연스러운 존댓말"} 직독직해 동시통역(trans)을 수행해 반드시 JSON 형식 {"orig":"원문","trans":"통역문"} 으로만 출력하십시오.`;
 
       try {
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
@@ -2277,7 +2322,6 @@
         const level = Math.min(100, Math.round(rms * 450));
         volumeFill.style.width = level + "%";
 
-        // 스피커 감쇠 모드일 때만 송출 중 입력 게인을 낮추고, 동시 송수신 모드에서는 100% 원음 그대로 전달
         const duckFactor = (isAiSpeaking && duplexModeSelect.value === "speaker_duck") ? 0.25 : 1.0;
 
         const int16Buffer = new Int16Array(downsampled16k.length);
@@ -2286,7 +2330,6 @@
           int16Buffer[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
         }
 
-        // 채널 1 웹소켓으로 실시간 연속 스트리밍
         if (!isRenewing && wsListener && wsListener.readyState === WebSocket.OPEN) {
           const base64Audio = arrayBufferToBase64(int16Buffer.buffer);
           wsListener.send(JSON.stringify({
@@ -2299,15 +2342,13 @@
           }));
         }
 
-        // 백업 PCM 슬라이딩 버퍼 적재 (전사 지연 대비용)
         if (rms > 0.012 && duckFactor === 1.0) {
           for (let i = 0; i < downsampled16k.length; i++) {
             pcmBackupSamples.push(downsampled16k[i]);
           }
           pcmBackupActiveVoiceSamples += downsampled16k.length;
 
-          // 활성 발화가 2.2초(35200샘플) 쌓였는데 채널 1 전사가 아직 도착하지 않았으면 즉시 백업 파이프라인 발사
-          if (pcmBackupActiveVoiceSamples >= 35200 && (Date.now() - lastTranscriptReceivedAt > 2100)) {
+          if (pcmBackupActiveVoiceSamples >= 32000 && (Date.now() - lastTranscriptReceivedAt > 1800)) {
             const sliceToSend = new Float32Array(pcmBackupSamples);
             pcmBackupSamples = [];
             pcmBackupActiveVoiceSamples = 0;
@@ -2347,11 +2388,16 @@
       isRunning = false;
       isConnecting = false;
       isRenewing = false;
+      isSpeakerReady = false;
       stopSlidingChunkLoop();
       stopSessionTimer();
       releaseWakeLock();
       clearRingBuffer();
       stopCurrentAudioCaptureOnly(true);
+
+      if ("speechSynthesis" in window) {
+        try { window.speechSynthesis.cancel(); } catch (e) {}
+      }
 
       hasAudioInputSource = false;
       audioSourceMode = "none";
